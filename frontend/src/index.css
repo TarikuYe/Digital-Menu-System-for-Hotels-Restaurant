@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #050505 !important;
+    color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Outfit', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(18, 18, 18, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.25rem;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.7);
+  }
+
+  .premium-button {
+    padding: 0.75rem 1.5rem;
+    background-color: #D4AF37;
+    color: #050505;
+    font-weight: 800;
+    border-radius: 0.85rem;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+  }
+
+  .premium-button:hover {
+    background-color: #F3E5AB;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.5);
+  }
+
+  .premium-button:active {
+    transform: scale(0.96) translateY(0);
+  }
+
+  .premium-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.85rem;
+    padding: 0.85rem 1.25rem;
+    color: white;
+    outline: none;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+  }
+
+  .premium-input:focus {
+    border-color: rgba(212, 175, 55, 0.7);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.2);
+  border-radius: 10px;
+  border: 2px solid #050505;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.4);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

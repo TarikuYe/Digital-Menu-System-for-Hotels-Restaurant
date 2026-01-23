@@ -1,0 +1,23 @@
+# Copy this file to .env and fill in your values
+# Rename this file from env-template.txt to .env
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=hotel_menu_system
+DB_USER=postgres
+DB_PASSWORD=Tare@kiya
+
+# JWT Configuration
+# IMPORTANT: Generate a secure random key for production!
+# Run: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+JWT_SECRET=hotel_menu_system_jwt_secret_key_2024_change_this_in_production
+JWT_EXPIRE=7d
+
+# CORS Configuration
+CORS_ORIGIN=http://localhost:5173
+
