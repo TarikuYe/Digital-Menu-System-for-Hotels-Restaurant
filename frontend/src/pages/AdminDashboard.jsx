@@ -16,11 +16,23 @@ import {
   Save,
   DollarSign,
   Users,
-  Shield,
-  Lock,
-  Power
+  Power,
+  Languages,
+  Settings,
+  Globe,
+  CreditCard,
+  FileText,
+  Download,
+  Calendar,
+  BarChart3,
+  PieChart,
+  TrendingUp,
+  Activity
 } from 'lucide-react';
-import { foodsAPI, menusAPI, feedbackAPI, ordersAPI, adminAPI } from '../services/api.js';
+import { foodsAPI, menusAPI, feedbackAPI, ordersAPI, adminAPI, localizationAPI, paymentsAPI, analyticsAPI } from '../services/api.js';
+
+
+
 import { ORDER_STATUS, SPICE_LEVELS, USER_ROLES } from '../utils/constants.js';
 import toast from 'react-hot-toast';
 
@@ -33,7 +45,19 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [allIngredients, setAllIngredients] = useState([]);
   const [menuSubTab, setMenuSubTab] = useState('dishes'); // 'dishes', 'categories', 'ingredients'
+  const [languages, setLanguages] = useState([]);
+  const [translations, setTranslations] = useState([]);
+  const [selectedLanguage, setSelectedLanguage] = useState(null);
+  const [settingsSubTab, setSettingsSubTab] = useState('languages'); // 'languages', 'translations'
+  const [paymentStats, setPaymentStats] = useState(null);
+  const [analyticsSales, setAnalyticsSales] = useState(null);
+  const [analyticsBehavior, setAnalyticsBehavior] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [payments, setPayments] = useState([]);
+
+
+
 
 
   // Modal State
@@ -84,6 +108,15 @@ const AdminDashboard = () => {
     loadData();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'settings' && settingsSubTab === 'translations' && selectedLanguage) {
+      localizationAPI.getTranslations(selectedLanguage.id)
+        .then(res => setTranslations(res.data.translations))
+        .catch(err => toast.error('Failed to load translations'));
+    }
+  }, [selectedLanguage, settingsSubTab, activeTab]);
+
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -100,12 +133,41 @@ const AdminDashboard = () => {
         const response = await feedbackAPI.getAll();
         setFeedback(response.data.feedback);
       } else if (activeTab === 'orders') {
-        const response = await ordersAPI.getAll();
-        setOrders(response.data.orders);
-      } else if (activeTab === 'users') {
+        const [orderRes, userRes] = await Promise.all([
+          ordersAPI.getAll(),
+          adminAPI.getUsers()
+        ]);
+        setOrders(orderRes.data.orders);
+        setUsers(userRes.data.users);
+      }
+      else if (activeTab === 'users') {
         const response = await adminAPI.getUsers();
         setUsers(response.data.users);
+      } else if (activeTab === 'settings') {
+        const response = await localizationAPI.getLanguages();
+        setLanguages(response.data.languages);
+        if (!selectedLanguage && response.data.languages.length > 0) {
+          const def = response.data.languages.find(l => l.is_default) || response.data.languages[0];
+          setSelectedLanguage(def);
+        }
+      } else if (activeTab === 'payments') {
+        const [payRes, statRes] = await Promise.all([
+          paymentsAPI.getPayments(),
+          paymentsAPI.getStats()
+        ]);
+        setPayments(payRes.data.payments);
+        setPaymentStats(statRes.data.stats);
+      } else if (activeTab === 'analytics') {
+        const [salesRes, behaviorRes] = await Promise.all([
+          analyticsAPI.getSales(),
+          analyticsAPI.getBehavior()
+        ]);
+        setAnalyticsSales(salesRes.data);
+        setAnalyticsBehavior(behaviorRes.data);
       }
+
+
+
     } catch (error) {
       console.error('Error loading admin data:', error);
       toast.error('Failed to load data');
@@ -114,15 +176,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateOrderStatus = async (orderId, status) => {
+  const handleUpdateOrderStatus = async (orderId, status, assigned_to) => {
     try {
-      await ordersAPI.updateStatus(orderId, status);
-      toast.success('Order status updated');
+      await ordersAPI.updateStatus(orderId, status, assigned_to);
+      toast.success('Order updated successfully');
       loadData();
     } catch (error) {
-      toast.error('Failed to update status');
+      toast.error('Failed to update order');
     }
   };
+
+  const handleUpdatePaymentStatus = async (paymentId, status) => {
+    try {
+      await paymentsAPI.updateStatus(paymentId, status);
+      toast.success('Payment updated');
+      loadData();
+    } catch (error) {
+      toast.error('Failed to update payment');
+    }
+  };
+
+
 
   const handleDelete = async (id, type) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
@@ -210,7 +284,13 @@ const AdminDashboard = () => {
     { id: 'menu', label: 'Menu & Food', icon: <Utensils size={18} /> },
     { id: 'users', label: 'Staff Management', icon: <Users size={18} /> },
     { id: 'feedback', label: 'Performance & Feedback', icon: <MessageSquare size={18} /> },
+    { id: 'payments', label: 'Finance & Payments', icon: <DollarSign size={18} /> },
+    { id: 'analytics', label: 'Reports & Analytics', icon: <BarChart3 size={18} /> },
+    { id: 'settings', label: 'System Settings', icon: <Settings size={18} /> },
   ];
+
+
+
 
   return (
     <div className="min-h-screen bg-brand-dark text-white p-6">
@@ -258,7 +338,21 @@ const AdminDashboard = () => {
               <Plus size={16} /> New Staff
             </button>
           )}
+          {activeTab === 'settings' && (
+
+            <button
+              onClick={() => {
+                const name = prompt('Language Name (e.g. Amharic):');
+                const code = prompt('Language Code (e.g. am):');
+                if (name && code) localizationAPI.createLanguage({ name, code }).then(loadData);
+              }}
+              className="premium-button !py-2.5 !px-6 text-xs uppercase tracking-widest flex items-center gap-2"
+            >
+              <Plus size={16} /> New Language
+            </button>
+          )}
         </div>
+
       </header>
 
       <div className="flex flex-col lg:flex-row gap-12">
@@ -286,7 +380,31 @@ const AdminDashboard = () => {
 
         {/* Content Area */}
         <main className="flex-1">
+          {activeTab === 'orders' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="glass-card p-6 border-l-4 border-gold">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Shift Revenue</p>
+                <h3 className="text-3xl font-black font-display text-white">
+                  ${orders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? parseFloat(o.total_amount) : 0), 0).toFixed(2)}
+                </h3>
+              </div>
+              <div className="glass-card p-6 border-l-4 border-blue-500">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Active Orders</p>
+                <h3 className="text-3xl font-black font-display text-white">
+                  {orders.filter(o => ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status)).length}
+                </h3>
+              </div>
+              <div className="glass-card p-6 border-l-4 border-green-500">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 mb-1">Completed (Shift)</p>
+                <h3 className="text-3xl font-black font-display text-white">
+                  {orders.filter(o => o.status === 'served').length}
+                </h3>
+              </div>
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
+
             {loading ? (
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -314,7 +432,13 @@ const AdminDashboard = () => {
                             <div className="px-3 py-1 rounded-full bg-gold/10 text-gold text-[10px] font-bold uppercase tracking-widest border border-gold/20">
                               Table {order.table_number || 'N/A'}
                             </div>
+                            {new Date() - new Date(order.created_at) > 15 * 60 * 1000 && order.status !== 'served' && order.status !== 'cancelled' && (
+                              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-500 text-[9px] font-black uppercase tracking-tighter animate-pulse border border-red-500/20">
+                                <AlertCircle size={12} /> Delayed (15m+)
+                              </div>
+                            )}
                           </div>
+
                           <div className="space-y-1 text-sm text-gray-500 font-light">
                             <p className="flex items-center gap-2"><Clock size={14} /> {new Date(order.created_at).toLocaleString()}</p>
                             <p className="font-bold text-white mt-4 uppercase text-[10px] tracking-[0.2em] mb-2">Items</p>
@@ -325,20 +449,60 @@ const AdminDashboard = () => {
                                 </div>
                               ))}
                             </div>
+                            {order.assigned_staff_name && (
+                              <p className="mt-4 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+                                Assigned To: {order.assigned_staff_name}
+                              </p>
+                            )}
+                          </div>
+
+                        </div>
+                        <div className="flex flex-col justify-between items-end gap-6 text-right">
+                          <div className="space-y-1">
+                            <span className="text-2xl font-black text-white block">${order.total_amount}</span>
+                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                              {order.customer_name || order.guest_name ? `By: ${order.customer_name || order.guest_name}` : 'Unknown Customer'}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col gap-3 items-end">
+                            <div className="flex gap-2">
+                              <select
+                                value={order.assigned_to || ''}
+                                onChange={(e) => handleUpdateOrderStatus(order.id, order.status, e.target.value)}
+                                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest focus:outline-none focus:border-gold transition-colors"
+                              >
+                                <option value="">Unassigned</option>
+                                {users.filter(u => [USER_ROLES.STAFF, USER_ROLES.KITCHEN].includes(u.role)).map(staff => (
+                                  <option key={staff.id} value={staff.id}>{staff.full_name.toUpperCase()}</option>
+                                ))}
+                              </select>
+
+                              <select
+                                value={order.status}
+                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                                className={`bg-white/5 border rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest focus:outline-none transition-colors
+                                  ${ORDER_STATUS[order.status]?.color === 'red' ? 'border-red-500/50 text-red-500' : 'border-white/10 text-white focus:border-gold'}`}
+                              >
+                                {Object.entries(ORDER_STATUS).map(([key, value]) => (
+                                  <option key={key} value={key}>{value.label.toUpperCase()}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {order.status !== 'cancelled' && order.status !== 'served' && (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Are you sure you want to cancel this order?')) handleUpdateOrderStatus(order.id, 'cancelled');
+                                }}
+                                className="text-[9px] font-bold uppercase tracking-widest text-red-500/60 hover:text-red-500 transition-colors flex items-center gap-1"
+                              >
+                                <X size={12} /> Cancel Order
+                              </button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex flex-col justify-between items-end gap-6">
-                          <span className="text-2xl font-black text-white">${order.total_amount}</span>
-                          <select
-                            value={order.status}
-                            onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                            className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs font-bold uppercase tracking-widest focus:outline-none focus:border-gold transition-colors"
-                          >
-                            {Object.entries(ORDER_STATUS).map(([key, value]) => (
-                              <option key={key} value={key}>{value.label.toUpperCase()}</option>
-                            ))}
-                          </select>
-                        </div>
+
                       </div>
                     ))}
                   </div>
@@ -620,6 +784,386 @@ const AdminDashboard = () => {
                     ))}
                   </div>
                 )}
+
+                {/* Payments & Finance View */}
+                {activeTab === 'payments' && (
+                  <div className="space-y-8">
+                    {/* Finance Highlights */}
+                    {paymentStats && (
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="glass-card p-6 border-l-4 border-gold bg-gold/5">
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gold">Monthly Revenue</p>
+                            <Calendar size={14} className="text-gold" />
+                          </div>
+                          <h3 className="text-3xl font-black font-display text-white">${parseFloat(paymentStats.monthly_revenue).toFixed(2)}</h3>
+                        </div>
+                        <div className="glass-card p-6 border-l-4 border-blue-500 bg-blue-500/5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 mb-2">Weekly Performance</p>
+                          <h3 className="text-3xl font-black font-display text-white">${parseFloat(paymentStats.weekly_revenue).toFixed(2)}</h3>
+                        </div>
+                        <div className="glass-card p-6 border-l-4 border-emerald-500 bg-emerald-500/5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400 mb-2">Cash Flows</p>
+                          <h3 className="text-lg font-bold text-white">{paymentStats.cash_transactions} Txns</h3>
+                        </div>
+                        <div className="glass-card p-6 border-l-4 border-purple-500 bg-purple-500/5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-400 mb-2">Digital Growth</p>
+                          <h3 className="text-lg font-bold text-white">{paymentStats.digital_transactions} Txns</h3>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="glass-card overflow-hidden">
+                      <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                        <h3 className="text-xl font-bold font-display flex items-center gap-2">
+                          <CreditCard size={20} className="text-gold" />
+                          Transaction History
+                        </h3>
+                        <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-all">
+                          <Download size={14} /> Export CSV
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                              <th className="p-4">Reference</th>
+                              <th className="p-4">Customer</th>
+                              <th className="p-4">Method</th>
+                              <th className="p-4">Amount</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4">Date</th>
+                              <th className="p-4">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {payments.map(pay => (
+                              <tr key={pay.id} className="border-b border-white/5 text-sm hover:bg-white/2 transition-colors">
+                                <td className="p-4 font-mono text-[10px]">{pay.transaction_reference || pay.id.slice(0, 8)}</td>
+                                <td className="p-4">
+                                  <div className="font-bold">{pay.customer_name || 'Guest'}</div>
+                                  <div className="text-[10px] text-gray-500">Table {pay.table_number || 'N/A'}</div>
+                                </td>
+                                <td className="p-4">
+                                  <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter
+                                    ${pay.payment_method === 'cash' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                    {pay.payment_method}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-black text-white">${pay.amount}</td>
+                                <td className="p-4">
+                                  <select
+                                    value={pay.status}
+                                    onChange={(e) => handleUpdatePaymentStatus(pay.id, e.target.value)}
+                                    className={`bg-transparent text-[10px] font-bold uppercase tracking-widest outline-none
+                                      ${pay.status === 'completed' ? 'text-green-400' : pay.status === 'failed' ? 'text-red-400' : 'text-gray-400'}`}
+                                  >
+                                    <option value="pending" className="bg-brand-dark">Pending</option>
+                                    <option value="completed" className="bg-brand-dark">Completed</option>
+                                    <option value="failed" className="bg-brand-dark">Failed</option>
+                                    <option value="refunded" className="bg-brand-dark">Refunded</option>
+                                  </select>
+                                </td>
+                                <td className="p-4 text-xs text-gray-400">{new Date(pay.created_at).toLocaleDateString()}</td>
+                                <td className="p-4">
+                                  <button className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white transition-all" title="View/Print Receipt">
+                                    <FileText size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reports & Analytics View */}
+                {activeTab === 'analytics' && analyticsSales && analyticsBehavior && (
+                  <div className="space-y-12">
+                    {/* Performance Overview */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      {/* Best Sellers */}
+                      <div className="glass-card p-6">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-xl font-bold font-display flex items-center gap-2">
+                            <TrendingUp size={20} className="text-gold" />
+                            Best Selling Items
+                          </h3>
+                        </div>
+                        <div className="space-y-4">
+                          {analyticsSales.bestSelling.map((item, i) => (
+                            <div key={i} className="flex items-center gap-4">
+                              <span className="w-6 text-xs font-black text-gray-600">0{i + 1}</span>
+                              <div className="flex-1">
+                                <div className="flex justify-between mb-1">
+                                  <span className="text-sm font-bold">{item.name}</span>
+                                  <span className="text-xs text-gold font-mono">{item.total_sold} sold</span>
+                                </div>
+                                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                  <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(item.total_sold / analyticsSales.bestSelling[0].total_sold) * 100}%` }}
+                                    className="h-full bg-gold"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Peak Ordering Times */}
+                      <div className="glass-card p-6">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-xl font-bold font-display flex items-center gap-2">
+                            <Activity size={20} className="text-blue-400" />
+                            Peak Ordering Hours
+                          </h3>
+                        </div>
+                        <div className="flex items-end gap-2 h-48 pt-4">
+                          {analyticsSales.peakTimes.map((time, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                              <div className="w-full bg-blue-500/20 rounded-t-lg transition-all group-hover:bg-blue-500/40 relative min-h-[4px]"
+                                style={{ height: `${(time.order_count / Math.max(...analyticsSales.peakTimes.map(t => t.order_count))) * 100}%` }}>
+                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                  {time.order_count}
+                                </span>
+                              </div>
+                              <span className="text-[8px] font-black text-gray-500">{time.hour}:00</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Customer Insights Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      {/* Tourist Favorites */}
+                      <div className="glass-card p-6 col-span-1">
+                        <h3 className="text-lg font-bold font-display mb-6 flex items-center gap-2">
+                          <Globe size={18} className="text-emerald-400" />
+                          Tourist Favorites
+                        </h3>
+                        <div className="space-y-4">
+                          {analyticsBehavior.touristFavorites.map((item, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 bg-white/2 rounded-xl border border-white/5">
+                              <span className="text-xs font-bold">{item.name}</span>
+                              <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-black uppercase">
+                                {item.order_count} Guests
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Dietary Preferences */}
+                      <div className="glass-card p-6 col-span-1">
+                        <h3 className="text-lg font-bold font-display mb-6 flex items-center gap-2">
+                          <PieChart size={18} className="text-purple-400" />
+                          Dietary Popularity
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          {Object.entries(analyticsBehavior.preferences).map(([key, val]) => (
+                            <div key={key} className="p-4 bg-white/2 rounded-2xl border border-white/5 text-center">
+                              <p className="text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">{key.replace('_sold', '').replace('_', ' ')}</p>
+                              <p className="text-xl font-black text-white">{val}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Customer Loyalty */}
+                      <div className="glass-card p-6 col-span-1 flex flex-col justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold font-display mb-6 flex items-center gap-2">
+                            <Users size={18} className="text-gold" />
+                            Customer Loyalty
+                          </h3>
+                          <div className="text-center py-8">
+                            <div className="text-5xl font-black text-gold mb-2">
+                              {analyticsBehavior.customerLoyalty.total_customers > 0
+                                ? Math.round((analyticsBehavior.customerLoyalty.repeat_customers / analyticsBehavior.customerLoyalty.total_customers) * 100)
+                                : 0}%
+                            </div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Repeat Customer Rate</p>
+                          </div>
+                        </div>
+                        <div className="pt-6 border-t border-white/5 flex justify-between text-[10px] font-bold uppercase text-gray-400">
+                          <span>{analyticsBehavior.customerLoyalty.repeat_customers} Loyal</span>
+                          <span>{analyticsBehavior.customerLoyalty.total_customers} Total</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Low Performing Alerts */}
+                    <div className="glass-card p-6 border-l-4 border-red-500 bg-red-500/5">
+                      <div className="flex items-center gap-2 mb-4 text-red-500">
+                        <AlertCircle size={20} />
+                        <h3 className="text-lg font-bold font-display">Optimization Suggestions (Low Performance)</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {analyticsSales.lowPerforming.map((item, i) => (
+                          <span key={i} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-bold border border-red-500/20">
+                            {item.name} ({item.total_sold} sales)
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-4 text-[10px] text-gray-500 italic">Consider updating descriptions, photos, or adjusting prices for these items.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* System Settings & Localization View */}
+
+
+                {activeTab === 'settings' && (
+                  <div className="space-y-8">
+                    {/* Sub-navigation */}
+                    <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl w-fit border border-white/5">
+                      <button
+                        onClick={() => setSettingsSubTab('languages')}
+                        className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all
+                          ${settingsSubTab === 'languages' ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Language Management
+                      </button>
+                      <button
+                        onClick={() => setSettingsSubTab('translations')}
+                        className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all
+                          ${settingsSubTab === 'translations' ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Menu Translations
+                      </button>
+                    </div>
+
+                    {settingsSubTab === 'languages' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {languages.map(lang => (
+                          <div key={lang.id} className="glass-card p-6 flex flex-col justify-between group">
+                            <div className="flex justify-between items-start mb-4">
+                              <div className={`p-3 rounded-2xl bg-white/5 text-white`}>
+                                <Globe size={24} />
+                              </div>
+                              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {!lang.is_default && (
+                                  <button
+                                    onClick={() => localizationAPI.updateLanguage(lang.id, { is_default: true }).then(loadData)}
+                                    className="px-3 py-1 bg-white/5 hover:bg-gold hover:text-black rounded text-[8px] font-black uppercase tracking-widest transition-all"
+                                  >
+                                    Set Default
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => confirm(`Permanently delete ${lang.name}?`) && localizationAPI.deleteLanguage(lang.id).then(loadData)}
+                                  className="p-2 rounded-lg text-red-500 hover:bg-red-500/10 transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-bold font-display flex items-center gap-2">
+                                {lang.name}
+                                {lang.is_default && <span className="text-[10px] bg-gold/20 text-gold px-2 py-0.5 rounded border border-gold/30 uppercase">Default</span>}
+                              </h3>
+                              <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mt-1">CODE: {lang.code}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {settingsSubTab === 'translations' && (
+                      <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/5">
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Translating To:</span>
+                            <div className="flex gap-2">
+                              {languages.map(lang => (
+                                <button
+                                  key={lang.id}
+                                  onClick={() => setSelectedLanguage(lang)}
+                                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border
+                                    ${selectedLanguage?.id === lang.id ? 'bg-gold text-black border-gold' : 'bg-white/5 text-gray-400 border-white/5 hover:bg-white/10'}`}
+                                >
+                                  {lang.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gold/60 font-bold uppercase tracking-widest flex items-center gap-2">
+                            <AlertCircle size={14} /> Local language: {selectedLanguage?.name} ({selectedLanguage?.code})
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="glass-card overflow-hidden">
+                            <table className="w-full text-left">
+                              <thead>
+                                <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b border-white/5">
+                                  <th className="p-4">Original (English)</th>
+                                  <th className="p-4">Localized Translation</th>
+                                  <th className="p-4 w-32">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {translations.map(t => (
+                                  <tr key={t.food_id} className="border-b border-white/5 text-sm hover:bg-white/2">
+                                    <td className="p-4 font-bold">{t.original_name}</td>
+                                    <td className="p-4">
+                                      <div className="space-y-2">
+                                        <input
+                                          placeholder="Translation for Name"
+                                          className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-1.5 focus:border-gold outline-none transition-all text-xs"
+                                          defaultValue={t.translated_name}
+                                          onBlur={(e) => {
+                                            if (e.target.value && e.target.value !== t.translated_name) {
+                                              localizationAPI.upsertTranslation({
+                                                food_id: t.food_id,
+                                                language_id: selectedLanguage.id,
+                                                name: e.target.value,
+                                                description: t.translated_description
+                                              }).then(() => toast.success('Saved')).catch(() => toast.error('Error'));
+                                            }
+                                          }}
+                                        />
+                                        <textarea
+                                          placeholder="Tourist-friendly description / Local explanation..."
+                                          className="w-full bg-black/20 border border-white/5 rounded-lg px-3 py-1.5 focus:border-gold outline-none transition-all text-[10px] h-16"
+                                          defaultValue={t.translated_description}
+                                          onBlur={(e) => {
+                                            if (e.target.value !== t.translated_description) {
+                                              localizationAPI.upsertTranslation({
+                                                food_id: t.food_id,
+                                                language_id: selectedLanguage.id,
+                                                name: t.translated_name || t.original_name,
+                                                description: e.target.value
+                                              }).then(() => toast.success('Saved')).catch(() => toast.error('Error'));
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                    </td>
+                                    <td className="p-4 text-center">
+                                      {t.translated_name ? (
+                                        <span className="text-green-500 flex items-center gap-1 text-[10px] font-black uppercase"><CheckCircle2 size={12} /> Translated</span>
+                                      ) : (
+                                        <span className="text-gray-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1"><Clock size={12} /> Pending</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
               </motion.div>
             )}

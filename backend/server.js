@@ -16,6 +16,12 @@ import guestRoutes from './routes/guest.js';
 import tableRoutes from './routes/tables.js';
 import managerRoutes from './routes/manager.js';
 import adminRoutes from './routes/admin.js';
+import localizationRoutes from './routes/localization.js';
+import paymentRoutes from './routes/payments.js';
+import analyticsRoutes from './routes/analytics.js';
+
+
+
 
 // Load environment variables
 dotenv.config();
@@ -66,6 +72,12 @@ app.use('/api/guest', guestRoutes);
 app.use('/api/tables', tableRoutes);
 app.use('/api/manager', managerRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/localization', localizationRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/analytics', analyticsRoutes);
+
+
+
 
 
 // Error handling middleware (must be last)

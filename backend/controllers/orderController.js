@@ -82,10 +82,11 @@ export const getOrders = async (req, res, next) => {
   try {
     const { status, limit = 50, offset = 0 } = req.query;
     let query = `
-      SELECT o.*, u.full_name as customer_name, gs.guest_name
+      SELECT o.*, u.full_name as customer_name, gs.guest_name, a.full_name as assigned_staff_name
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN guest_sessions gs ON o.guest_session_id = gs.id
+      LEFT JOIN users a ON o.assigned_to = a.id
       WHERE 1=1
     `;
     const params = [];
@@ -98,8 +99,15 @@ export const getOrders = async (req, res, next) => {
         params.push(req.user.id);
       }
     }
-    // Filter status etc... (omitted for brevity in replace, but keeping logic)
-    query += ` ORDER BY o.created_at DESC LIMIT 50`;
+
+    if (status) {
+      query += ` AND o.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
     const result = await pool.query(query, params);
 
     for (const order of result.rows) {
@@ -109,6 +117,7 @@ export const getOrders = async (req, res, next) => {
     res.json({ orders: result.rows });
   } catch (error) { next(error); }
 };
+
 
 export const getOrderById = async (req, res, next) => {
   try {
@@ -126,7 +135,7 @@ export const getOrderById = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, assigned_to } = req.body;
 
     const currentOrder = await pool.query('SELECT status FROM orders WHERE id = $1', [id]);
     if (currentOrder.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
@@ -134,19 +143,43 @@ export const updateOrderStatus = async (req, res, next) => {
     const oldStatus = currentOrder.rows[0].status;
 
     await pool.query('BEGIN');
-    await pool.query('UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [status, id]);
-    await pool.query(
-      'INSERT INTO order_status_logs (order_id, old_status, new_status, changed_by) VALUES ($1, $2, $3, $4)',
-      [id, oldStatus, status, req.user.id]
-    );
+
+    let updateQuery = 'UPDATE orders SET updated_at = CURRENT_TIMESTAMP';
+    const params = [id];
+    let paramCount = 1;
+
+    if (status) {
+      paramCount++;
+      updateQuery += `, status = $${paramCount}`;
+      params.push(status);
+    }
+
+    if (assigned_to !== undefined) {
+      paramCount++;
+      updateQuery += `, assigned_to = $${paramCount}`;
+      params.push(assigned_to || null);
+    }
+
+    updateQuery += ' WHERE id = $1 RETURNING *';
+
+    const result = await pool.query(updateQuery, params);
+
+    if (status && status !== oldStatus) {
+      await pool.query(
+        'INSERT INTO order_status_logs (order_id, old_status, new_status, changed_by) VALUES ($1, $2, $3, $4)',
+        [id, oldStatus, status, req.user.id]
+      );
+    }
+
     await pool.query('COMMIT');
 
-    res.json({ message: 'Status updated', status });
+    res.json({ message: 'Order updated', order: result.rows[0] });
   } catch (error) {
     await pool.query('ROLLBACK');
     next(error);
   }
 };
+
 
 export const getPrepTimeAnalytics = async (req, res, next) => {
   try {

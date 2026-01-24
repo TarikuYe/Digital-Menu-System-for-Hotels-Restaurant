@@ -74,7 +74,7 @@ export const ordersAPI = {
   create: (data) => api.post('/orders', data),
   getAll: (params) => api.get('/orders', { params }),
   getById: (id) => api.get(`/orders/${id}`),
-  updateStatus: (id, status) => api.put(`/orders/${id}/status`, { status }),
+  updateStatus: (id, status, assigned_to) => api.put(`/orders/${id}/status`, { status, assigned_to }),
   getPrepTimeAnalytics: () => api.get('/orders/analytics/prep-time'),
 };
 
@@ -121,6 +121,33 @@ export const adminAPI = {
   resetPassword: (id, password) => api.patch(`/admin/users/${id}/reset-password`, { password }),
   deleteUser: (id) => api.delete(`/admin/users/${id}`),
 };
+
+// Localization API
+export const localizationAPI = {
+  getLanguages: () => api.get('/localization/languages'),
+  createLanguage: (data) => api.post('/localization/languages', data),
+  updateLanguage: (id, data) => api.put(`/localization/languages/${id}`, data),
+  deleteLanguage: (id) => api.delete(`/localization/languages/${id}`),
+  getTranslations: (languageId) => api.get('/localization/translations', { params: { language_id: languageId } }),
+  upsertTranslation: (data) => api.post('/localization/translations', data),
+};
+
+// Payments API
+export const paymentsAPI = {
+  getPayments: (params) => api.get('/payments', { params }),
+  getStats: () => api.get('/payments/stats'),
+  updateStatus: (id, status) => api.patch(`/payments/${id}/status`, { status }),
+  create: (data) => api.post('/payments', data),
+};
+
+// Analytics API
+export const analyticsAPI = {
+  getSales: () => api.get('/analytics/sales'),
+  getBehavior: () => api.get('/analytics/behavior'),
+};
+
+
+
 
 
 export default api;
