@@ -27,8 +27,11 @@ import {
   BarChart3,
   PieChart,
   TrendingUp,
-  Activity
+  Activity,
+  Brain,
+  MessageCircle
 } from 'lucide-react';
+
 import { foodsAPI, menusAPI, feedbackAPI, ordersAPI, adminAPI, localizationAPI, paymentsAPI, analyticsAPI } from '../services/api.js';
 
 
@@ -52,7 +55,9 @@ const AdminDashboard = () => {
   const [paymentStats, setPaymentStats] = useState(null);
   const [analyticsSales, setAnalyticsSales] = useState(null);
   const [analyticsBehavior, setAnalyticsBehavior] = useState(null);
+  const [feedbackInsights, setFeedbackInsights] = useState(null);
   const [loading, setLoading] = useState(false);
+
 
   const [payments, setPayments] = useState([]);
 
@@ -130,9 +135,14 @@ const AdminDashboard = () => {
         setMenus(menuRes.data.menus);
         setAllIngredients(ingRes.data.ingredients);
       } else if (activeTab === 'feedback') {
-        const response = await feedbackAPI.getAll();
-        setFeedback(response.data.feedback);
-      } else if (activeTab === 'orders') {
+        const [feedbackRes, insightRes] = await Promise.all([
+          feedbackAPI.getAll(),
+          feedbackAPI.getInsights()
+        ]);
+        setFeedback(feedbackRes.data.feedback);
+        setFeedbackInsights(insightRes.data);
+      }
+      else if (activeTab === 'orders') {
         const [orderRes, userRes] = await Promise.all([
           ordersAPI.getAll(),
           adminAPI.getUsers()
@@ -762,28 +772,133 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-                {/* Feedback View */}
+                {/* Feedback & AI Sentiment View */}
                 {activeTab === 'feedback' && (
-                  <div className="space-y-4">
-                    {feedback.length === 0 && <div className="text-center text-gray-500 py-12">No feedback received yet.</div>}
-                    {feedback.map(item => (
-                      <div key={item.id} className="glass-card p-6">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1 text-gold">
-                              {[...Array(5)].map((_, i) => (
-                                <span key={i} className={i < item.rating ? 'fill-current' : 'text-gray-700'}>★</span>
+                  <div className="space-y-8">
+                    {/* AI Insights & Patterns */}
+                    {feedbackInsights && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="glass-card p-6 border-l-4 border-gold bg-gold/5">
+                          <div className="flex items-center gap-3 mb-6">
+                            <Brain className="text-gold" size={24} />
+                            <h3 className="text-lg font-bold font-display">AI Pattern Detection</h3>
+                          </div>
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Frequently Mentioned Complaints</p>
+                            <div className="flex flex-wrap gap-2">
+                              {feedbackInsights.commonComplaints.map(([word, count], i) => (
+                                <span key={i} className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-white flex items-center gap-2">
+                                  {word} <span className="text-gold">{count}</span>
+                                </span>
                               ))}
                             </div>
-                            <span className="text-xs text-gray-500 ml-2">{new Date(item.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        <p className="text-gray-300 italic">"{item.comment}"</p>
-                        {item.food_name && <p className="text-xs text-gray-500 mt-2">On dish: {item.food_name}</p>}
+
+                        <div className="glass-card p-6 border-l-4 border-red-500 bg-red-500/5">
+                          <div className="flex items-center gap-3 mb-6">
+                            <TrendingUp className="text-red-500 rotate-180" size={24} />
+                            <h3 className="text-lg font-bold font-display text-red-500">Needing Improvement</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {feedbackInsights.needingImprovement.map((food, i) => (
+                              <div key={i} className="flex justify-between items-center text-sm">
+                                <span className="font-bold text-white">{food.name}</span>
+                                <span className="text-red-400 font-mono flex items-center gap-1">
+                                  {food.negative_count} negative feedbacks
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Feedback List with Monitoring & Control */}
+                    <div className="space-y-4">
+                      {feedback.length === 0 && <div className="text-center text-gray-500 py-12">No feedback received yet.</div>}
+                      {feedback.map(item => (
+                        <div key={item.id} className="glass-card p-6 group">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-3">
+                                <div className="flex gap-1 text-gold">
+                                  {[...Array(5)].map((_, i) => (
+                                    <span key={i} className={i < item.rating ? 'fill-current' : 'text-gray-700'}>★</span>
+                                  ))}
+                                </div>
+                                <span className="text-xs text-gray-500 font-mono">{new Date(item.created_at).toLocaleString()}</span>
+                              </div>
+                              <p className="text-sm font-bold text-white">
+                                {item.user_name || 'Guest'} <span className="text-[10px] text-gray-500 font-normal ml-2">{item.user_email}</span>
+                              </p>
+                            </div>
+
+                            {/* Sentiment Badge */}
+                            <div className="flex gap-2 items-center">
+                              {item.sentiment_label ? (
+                                <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border
+                                  ${item.sentiment_label === 'positive' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                    item.sentiment_label === 'negative' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                      'bg-white/5 text-gray-400 border-white/10'}`}>
+                                  <Brain size={12} /> {item.sentiment_label}
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => feedbackAPI.analyzeSentiment(item.id).then(loadData)}
+                                  className="px-3 py-1 rounded-full bg-white/5 text-[9px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-all border border-white/5"
+                                >
+                                  Analyze Sentiment
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-4 bg-white/2 rounded-2xl border border-white/5 relative mb-4">
+                            <p className="text-gray-300 italic text-sm">"{item.comment}"</p>
+                            {item.food_name && (
+                              <div className="absolute -top-2 right-4 px-2 py-0.5 bg-brand-dark border border-white/5 text-[8px] font-black uppercase tracking-widest text-gold rounded">
+                                {item.food_name}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Response Section */}
+                          <div className="space-y-3">
+                            {item.admin_response ? (
+                              <div className="flex gap-3 items-start p-4 bg-brand-dark/50 border border-gold/10 rounded-2xl">
+                                <MessageCircle size={18} className="text-gold mt-1 shrink-0" />
+                                <div className="space-y-1">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-gold">Official Response</p>
+                                  <p className="text-xs text-gray-400">{item.admin_response}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <input
+                                  placeholder="Respond to customer..."
+                                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs focus:border-gold outline-none transition-all"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && e.target.value) {
+                                      feedbackAPI.respond(item.id, e.target.value).then(() => {
+                                        toast.success('Response sent');
+                                        loadData();
+                                      });
+                                    }
+                                  }}
+                                />
+                                <button className="px-4 py-2 bg-gold text-black rounded-xl text-[10px] font-black uppercase tracking-widest">
+                                  Send
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
+
 
                 {/* Payments & Finance View */}
                 {activeTab === 'payments' && (

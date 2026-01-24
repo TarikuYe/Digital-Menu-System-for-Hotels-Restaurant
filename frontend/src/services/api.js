@@ -83,8 +83,12 @@ export const feedbackAPI = {
   create: (data) => api.post('/feedback', data),
   getAll: (params) => api.get('/feedback', { params }),
   getById: (id) => api.get(`/feedback/${id}`),
-  updateVisibility: (id, is_visible) => api.put(`/feedback/${id}/visibility`, { is_visible }),
+  respond: (id, response) => api.post(`/feedback/${id}/respond`, { response }),
+  analyzeSentiment: (id) => api.post(`/feedback/${id}/analyze`),
+  bulkAnalyze: () => api.post('/feedback/analytics/bulk-analyze'),
+  getInsights: () => api.get('/feedback/analytics/insights'),
 };
+
 
 // Guest API
 export const guestAPI = {

@@ -57,8 +57,8 @@ export const createFeedback = async (req, res, next) => {
 // Get feedback (Admin/Staff can see all, Customer sees own)
 export const getFeedback = async (req, res, next) => {
   try {
-    const { food_id, user_id, limit = 50, offset = 0 } = req.query;
-    
+    const { food_id, user_id, start_date, end_date, sentiment, limit = 50, offset = 0 } = req.query;
+
     let query = `
       SELECT 
         f.*,
@@ -68,30 +68,42 @@ export const getFeedback = async (req, res, next) => {
       FROM feedback f
       LEFT JOIN users u ON f.user_id = u.id
       LEFT JOIN foods fo ON f.food_id = fo.id
-      WHERE f.is_visible = true
+      WHERE 1=1
     `;
     const params = [];
-    let paramCount = 0;
 
-    // Filter by user if customer
+    // Filter by visibility for customers
     if (req.user.role === 'customer') {
-      paramCount++;
-      query += ` AND f.user_id = $${paramCount}`;
+      query += ` AND f.is_visible = true AND f.user_id = $${params.length + 1}`;
       params.push(req.user.id);
     } else if (user_id) {
-      paramCount++;
-      query += ` AND f.user_id = $${paramCount}`;
+      query += ` AND f.user_id = $${params.length + 1}`;
       params.push(user_id);
     }
 
     // Filter by food
     if (food_id) {
-      paramCount++;
-      query += ` AND f.food_id = $${paramCount}`;
+      query += ` AND f.food_id = $${params.length + 1}`;
       params.push(food_id);
     }
 
-    query += ` ORDER BY f.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    // Filter by date
+    if (start_date) {
+      query += ` AND f.created_at >= $${params.length + 1}`;
+      params.push(start_date);
+    }
+    if (end_date) {
+      query += ` AND f.created_at <= $${params.length + 1}`;
+      params.push(end_date);
+    }
+
+    // Filter by sentiment
+    if (sentiment) {
+      query += ` AND f.sentiment_label = $${params.length + 1}`;
+      params.push(sentiment);
+    }
+
+    query += ` ORDER BY f.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
@@ -101,6 +113,7 @@ export const getFeedback = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Get single feedback by ID
 export const getFeedbackById = async (req, res, next) => {
@@ -137,28 +150,126 @@ export const getFeedbackById = async (req, res, next) => {
   }
 };
 
-// Update feedback visibility (Admin)
-export const updateFeedbackVisibility = async (req, res, next) => {
+// Respond to feedback (Admin)
+export const respondToFeedback = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { is_visible } = req.body;
-
-    if (typeof is_visible !== 'boolean') {
-      return res.status(400).json({ error: 'is_visible must be a boolean' });
-    }
+    const { response } = req.body;
 
     const result = await pool.query(
-      'UPDATE feedback SET is_visible = $1 WHERE id = $2 RETURNING *',
-      [is_visible, id]
+      'UPDATE feedback SET admin_response = $1, admin_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+      [response, req.user.id, id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Feedback not found' });
     }
 
-    res.json({ message: 'Feedback visibility updated', feedback: result.rows[0] });
+    res.json({ message: 'Response added successfully', feedback: result.rows[0] });
   } catch (error) {
     next(error);
   }
 };
+
+// Simulated AI Sentiment Analysis
+const analyzeTextSentiment = (text) => {
+  if (!text) return { score: 0, label: 'neutral' };
+
+  const positiveWords = ['good', 'great', 'excellent', 'amazing', 'delicious', 'tasty', 'wonderful', 'perfect', 'love', 'best'];
+  const negativeWords = ['bad', 'poor', 'terrible', 'awful', 'cold', 'salty', 'late', 'rude', 'disappointing', 'worst', 'failed'];
+
+  const words = text.toLowerCase().split(/\s+/);
+  let score = 0;
+
+  words.forEach(word => {
+    if (positiveWords.includes(word)) score += 0.2;
+    if (negativeWords.includes(word)) score -= 0.2;
+  });
+
+  // Normalize score between -1 and 1
+  score = Math.max(-1, Math.min(1, score));
+
+  let label = 'neutral';
+  if (score > 0.1) label = 'positive';
+  if (score < -0.1) label = 'negative';
+
+  return { score: parseFloat(score.toFixed(2)), label };
+};
+
+export const runSentimentAnalysis = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const feedbackRes = await pool.query('SELECT comment FROM feedback WHERE id = $1', [id]);
+    if (feedbackRes.rows.length === 0) return res.status(404).json({ error: 'Feedback not found' });
+
+    const comment = feedbackRes.rows[0].comment;
+    const { score, label } = analyzeTextSentiment(comment);
+
+    const result = await pool.query(
+      'UPDATE feedback SET sentiment_score = $1, sentiment_label = $2, sentiment_analyzed_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+      [score, label, id]
+    );
+
+    res.json({ message: 'Sentiment analyzed', feedback: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Bulk Analyze Sentiment
+export const bulkAnalyzeSentiment = async (req, res, next) => {
+  try {
+    const feedbacks = await pool.query('SELECT id, comment FROM feedback WHERE sentiment_label IS NULL AND comment IS NOT NULL');
+    const results = [];
+
+    for (const f of feedbacks.rows) {
+      const { score, label } = analyzeTextSentiment(f.comment);
+      const update = await pool.query(
+        'UPDATE feedback SET sentiment_score = $1, sentiment_label = $2, sentiment_analyzed_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+        [score, label, f.id]
+      );
+      results.push(update.rows[0]);
+    }
+
+    res.json({ message: `Analyzed ${results.length} records`, results });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInsights = async (req, res, next) => {
+  try {
+    // Foods needing improvement (Negative sentiment count > 3)
+    const improvementQuery = `
+      SELECT f.name, COUNT(*) as negative_count
+      FROM feedback fb
+      JOIN foods f ON fb.food_id = f.id
+      WHERE fb.sentiment_label = 'negative'
+      GROUP BY f.id, f.name
+      HAVING COUNT(*) >= 1
+      ORDER BY negative_count DESC
+    `;
+    const improvements = await pool.query(improvementQuery);
+
+    // Detection patterns (Keywords most used in negative feedback)
+    const negativeComments = await pool.query("SELECT comment FROM feedback WHERE sentiment_label = 'negative'");
+    const wordFreq = {};
+    negativeComments.rows.forEach(row => {
+      const words = row.comment.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/);
+      words.forEach(word => {
+        if (word.length > 3) wordFreq[word] = (wordFreq[word] || 0) + 1;
+      });
+    });
+    const patterns = Object.entries(wordFreq).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    res.json({
+      needingImprovement: improvements.rows,
+      commonComplaints: patterns
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
