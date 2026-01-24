@@ -11,6 +11,11 @@ import menuRoutes from './routes/menus.js';
 import orderRoutes from './routes/orders.js';
 import feedbackRoutes from './routes/feedback.js';
 import kitchenRoutes from './routes/kitchen.js';
+import cashierRoutes from './routes/cashier.js';
+import guestRoutes from './routes/guest.js';
+import tableRoutes from './routes/tables.js';
+import managerRoutes from './routes/manager.js';
+import adminRoutes from './routes/admin.js';
 
 // Load environment variables
 dotenv.config();
@@ -56,6 +61,12 @@ app.use('/api/menus', menuRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/cashier', cashierRoutes);
+app.use('/api/guest', guestRoutes);
+app.use('/api/tables', tableRoutes);
+app.use('/api/manager', managerRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 // Error handling middleware (must be last)
 app.use(notFound);
@@ -93,3 +104,5 @@ async function startServer() {
 
 startServer();
 
+
+// Triggering restart

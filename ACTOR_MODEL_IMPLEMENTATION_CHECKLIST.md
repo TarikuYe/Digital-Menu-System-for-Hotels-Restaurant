@@ -74,90 +74,83 @@ This checklist tracks the implementation status of all actors and features defin
 - [ ] `backend/controllers/kitchenController.js`
 - [ ] `backend/routes/kitchen.js`
 
-### Cashier 🔄
+### Cashier ✅ COMPLETE
 **Database:** ✅ Role added to constants  
 **Migration:** ✅ Payment tables created  
-**Implementation:** ⏳ Pending
+**Implementation:** ✅ Complete
 
 #### Tasks:
-- [ ] Create Cashier interface
-- [ ] View orders ready for payment
-- [ ] Process cash payments
-- [ ] Process digital payments (gateway integration)
-- [ ] Generate receipts
-- [ ] Handle refunds
-- [ ] Daily transaction summary
-- [ ] Cash drawer reconciliation
+- [x] Create Cashier interface
+- [x] View orders ready for payment
+- [x] Process cash payments
+- [x] Process digital payments (Gateway placeholder/simulation)
+- [x] Generate receipts (Database record + UI display)
+- [ ] Handle refunds (Future)
+- [x] Daily transaction summary
+- [ ] Cash drawer reconciliation (Future)
 
 #### Files to Create/Modify:
-- [ ] `frontend/src/pages/CashierDashboard.jsx`
-- [ ] `frontend/src/components/Cashier/PaymentProcessor.jsx`
-- [ ] `frontend/src/components/Cashier/ReceiptGenerator.jsx`
-- [ ] `backend/controllers/paymentController.js`
-- [ ] `backend/controllers/receiptController.js`
-- [ ] `backend/routes/payments.js`
-- [ ] `backend/routes/receipts.js`
+- [x] `frontend/src/pages/CashierDashboard.jsx`
+- [x] `backend/controllers/cashierController.js` (Replaces paymentController/receiptController)
+- [x] `backend/routes/cashier.js` (Replaces payments.js/receipts.js)
 
-### Waiter / Service Staff 🔄
+### Waiter / Service Staff ✅ COMPLETE
 **Database:** ✅ Existing staff role  
 **Migration:** ✅ Table management ready  
-**Implementation:** 🔄 Partial
+**Implementation:** ✅ Complete
 
 #### Tasks:
-- [x] View orders
+- [x] View orders (via My Orders / Shared view)
 - [x] Update order status
-- [ ] Table management interface
-- [ ] Assign orders to tables
-- [ ] View table status (available, occupied, dirty)
-- [ ] Mark tables for cleaning
-- [ ] View assigned tables only
-- [ ] Customer assistance features
-- [ ] Special request handling
+- [x] Table management interface
+- [x] View active orders per table
+- [x] View table status (available, occupied, dirty, reserved)
+- [x] Mark tables for cleaning
+- [x] View assigned guest info
+- [ ] Assign orders to tables (handled via Guest Session mostly)
 
 #### Files to Create/Modify:
-- [ ] `frontend/src/pages/WaiterDashboard.jsx`
-- [ ] `frontend/src/components/Waiter/TableMap.jsx`
-- [ ] `frontend/src/components/Waiter/TableCard.jsx`
-- [ ] `backend/controllers/tableController.js`
-- [ ] `backend/routes/tables.js`
+- [x] `frontend/src/pages/WaiterDashboard.jsx`
+- [x] `backend/controllers/tableController.js`
+- [x] `backend/routes/tables.js`
 
-### Guest Sessions (QR Code Access) 🔄
+### Guest Sessions (QR Code Access) ✅ COMPLETE
 **Database:** ✅ Tables created in migration_v2.sql  
 **Migration:** ✅ Complete  
-**Implementation:** ⏳ Pending
+**Implementation:** ✅ Complete
 
 #### Tasks:
-- [ ] Run migration_v2.sql
-- [ ] Generate QR codes for tables
-- [ ] Guest session creation endpoint
-- [ ] Session token validation
-- [ ] Guest order placement (no login)
-- [ ] Session expiration handling
-- [ ] Link orders to tables
+- [x] Run migration_v2.sql
+- [x] Generate QR codes for tables (Seeded)
+- [x] Guest session creation endpoint `POST /session`
+- [x] Session token validation `GET /verify/:token`
+- [x] Guest order placement (no login) via Guest Header
+- [x] Session expiration handling (Database Default 6h)
+- [x] Link orders to tables
 - [ ] QR code regeneration (admin)
 
 #### Files to Create/Modify:
-- [ ] `backend/controllers/guestController.js`
-- [ ] `backend/routes/guest.js`
-- [ ] `backend/utils/qrCodeGenerator.js`
-- [ ] `frontend/src/pages/GuestMenuPage.jsx`
-- [ ] `frontend/src/components/Guest/SessionHandler.jsx`
+- [x] `backend/controllers/guestController.js`
+- [x] `backend/routes/guest.js`
+- [x] `backend/utils/qrCodeGenerator.js`
+- [x] `frontend/src/pages/GuestEntry.jsx`
+- [x] `frontend/src/context/AuthContext.jsx`
 
 ---
 
-## Phase 3: Management Layer 📋 PLANNED
+## Phase 3: Management Layer 🔄 IN PROGRESS
 
-### Restaurant Manager 📋
+### Restaurant Manager 🔄 IN PROGRESS
 **Database:** ✅ Role added to constants  
 **Migration:** ✅ Role constraint updated  
-**Implementation:** ⏳ Pending
+**Implementation:** 🔄 In Progress
 
 #### Tasks:
-- [ ] Create Manager Dashboard
-- [ ] Real-time operations overview
+- [x] Create Manager Dashboard
+- [x] Real-time operations overview
 - [ ] Staff performance metrics
-- [ ] Daily sales reports
-- [ ] Customer feedback monitoring
+- [x] Daily sales reports (Basic Revenue)
+- [ ] Customer feedback monitoring (Via Activity Feed)
 - [ ] Menu item performance analysis
 - [ ] Table turnover analytics
 - [ ] Peak hours analysis
@@ -165,12 +158,12 @@ This checklist tracks the implementation status of all actors and features defin
 - [ ] Complaint handling system
 
 #### Files to Create/Modify:
-- [ ] `frontend/src/pages/ManagerDashboard.jsx`
-- [ ] `frontend/src/components/Manager/OperationsOverview.jsx`
+- [x] `frontend/src/pages/ManagerDashboard.jsx`
+- [ ] `frontend/src/components/Manager/OperationsOverview.jsx` (Integrated)
 - [ ] `frontend/src/components/Manager/StaffPerformance.jsx`
 - [ ] `frontend/src/components/Manager/SalesReports.jsx`
-- [ ] `backend/controllers/managerController.js`
-- [ ] `backend/routes/manager.js`
+- [x] `backend/controllers/managerController.js`
+- [x] `backend/routes/manager.js`
 
 ### Analytics Dashboard 📋
 **Database:** ✅ Materialized view created  

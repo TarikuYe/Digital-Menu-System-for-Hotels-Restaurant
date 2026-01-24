@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
@@ -7,6 +8,10 @@ import MenuPage from './pages/MenuPage.jsx';
 import OrderPage from './pages/OrderPage.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import KitchenDashboard from './pages/KitchenDashboard.jsx';
+import ManagerDashboard from './pages/ManagerDashboard.jsx';
+import CashierDashboard from './pages/CashierDashboard.jsx';
+import WaiterDashboard from './pages/WaiterDashboard.jsx';
+import GuestEntry from './pages/GuestEntry.jsx';
 import Navbar from './components/Common/Navbar.jsx';
 
 const PrivateRoute = ({ children, requireAdmin = false, requireStaff = false, allowedRoles = [] }) => {
@@ -62,6 +67,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/manager"
+        element={
+          <PrivateRoute allowedRoles={['manager', 'admin']}>
+            <ManagerDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/kitchen"
         element={
           <PrivateRoute allowedRoles={['kitchen', 'manager', 'staff']}>
@@ -69,6 +82,23 @@ const AppRoutes = () => {
           </PrivateRoute>
         }
       />
+      <Route
+        path="/cashier"
+        element={
+          <PrivateRoute allowedRoles={['cashier', 'manager', 'admin']}>
+            <CashierDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/waiter"
+        element={
+          <PrivateRoute allowedRoles={['staff', 'manager', 'admin']}>
+            <WaiterDashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route path="/scan/:token" element={<GuestEntry />} />
       <Route path="/" element={<Navigate to="/menu" replace />} />
     </Routes>
   );
@@ -90,4 +120,3 @@ function App() {
 }
 
 export default App;
-

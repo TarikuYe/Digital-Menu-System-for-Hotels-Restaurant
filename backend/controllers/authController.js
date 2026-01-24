@@ -79,7 +79,7 @@ export const login = async (req, res, next) => {
 
     // Find user
     const result = await pool.query(
-      'SELECT id, email, password_hash, full_name, role, phone FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, full_name, role, phone, is_active FROM users WHERE email = $1',
       [email]
     );
 
@@ -89,11 +89,17 @@ export const login = async (req, res, next) => {
 
     const user = result.rows[0];
 
+    // Check if account is active
+    if (user.is_active === false) {
+      return res.status(403).json({ error: 'Your account has been deactivated. Please contact an administrator.' });
+    }
+
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
+
 
     // Generate JWT token
     const token = jwt.sign(

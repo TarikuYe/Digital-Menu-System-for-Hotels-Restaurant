@@ -12,8 +12,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    const guestToken = localStorage.getItem('guestToken');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (guestToken) {
+      config.headers.Authorization = `Guest ${guestToken}`;
     }
     return config;
   },
@@ -49,7 +53,12 @@ export const foodsAPI = {
   create: (data) => api.post('/foods', data),
   update: (id, data) => api.put(`/foods/${id}`, data),
   delete: (id) => api.delete(`/foods/${id}`),
+  getIngredients: () => api.get('/foods/ingredients'),
+  createIngredient: (data) => api.post('/foods/ingredients', data),
+  deleteIngredient: (id) => api.delete(`/foods/ingredients/${id}`),
 };
+
+
 
 // Menus API
 export const menusAPI = {
@@ -76,6 +85,43 @@ export const feedbackAPI = {
   getById: (id) => api.get(`/feedback/${id}`),
   updateVisibility: (id, is_visible) => api.put(`/feedback/${id}/visibility`, { is_visible }),
 };
+
+// Guest API
+export const guestAPI = {
+  verifyToken: (token) => api.get(`/guest/verify/${token}`),
+  startSession: (data) => api.post('/guest/session', data),
+  getSessionStatus: () => api.get('/guest/status'),
+};
+
+// Tables API
+export const tablesAPI = {
+  getAll: () => api.get('/tables'),
+  getById: (id) => api.get(`/tables/${id}`),
+  updateStatus: (id, status) => api.put(`/tables/${id}/status`, { status }),
+};
+
+// Kitchen API
+export const kitchenAPI = {
+  getOrders: () => api.get('/kitchen/orders'),
+  updateStatus: (id, status) => api.patch(`/kitchen/orders/${id}/status`, { status }),
+};
+
+// Manager API
+export const managerAPI = {
+  getStats: () => api.get('/manager/stats'),
+  getActivity: () => api.get('/manager/activity'),
+};
+
+// Admin API
+export const adminAPI = {
+  getUsers: () => api.get('/admin/users'),
+  createUser: (data) => api.post('/admin/users', data),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  setUserStatus: (id, is_active) => api.patch(`/admin/users/${id}/status`, { is_active }),
+  resetPassword: (id, password) => api.patch(`/admin/users/${id}/reset-password`, { password }),
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+};
+
 
 export default api;
 

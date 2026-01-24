@@ -21,6 +21,12 @@ export const getFoods = async (req, res, next) => {
         f.is_vegetarian,
         f.is_vegan,
         f.is_gluten_free,
+        f.is_special,
+        f.is_recommended,
+        f.available_from,
+        f.available_until,
+        f.seasonal_start,
+        f.seasonal_end,
         f.calories,
         f.display_order,
         f.created_at
@@ -72,13 +78,13 @@ export const getFoods = async (req, res, next) => {
       if (langResult.rows.length > 0) {
         const langId = langResult.rows[0].id;
         const foodIds = foods.map(f => f.id);
-        
+
         if (foodIds.length > 0) {
           const translationsResult = await pool.query(
             'SELECT food_id, name, description FROM food_translations WHERE food_id = ANY($1) AND language_id = $2',
             [foodIds, langId]
           );
-          
+
           const translationsMap = {};
           translationsResult.rows.forEach(t => {
             translationsMap[t.food_id] = t;
@@ -181,6 +187,12 @@ export const createFood = async (req, res, next) => {
       is_vegetarian = false,
       is_vegan = false,
       is_gluten_free = false,
+      is_special = false,
+      is_recommended = false,
+      available_from = null,
+      available_until = null,
+      seasonal_start = null,
+      seasonal_end = null,
       calories,
       display_order = 0,
       ingredient_ids = [],
@@ -194,9 +206,11 @@ export const createFood = async (req, res, next) => {
       `INSERT INTO foods (
         menu_id, name, description, price, image_url, spice_level, 
         preparation_time, is_vegetarian, is_vegan, is_gluten_free, 
-        calories, display_order
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        is_special, is_recommended, available_from, available_until,
+        seasonal_start, seasonal_end, calories, display_order
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING *`,
+
       [
         menu_id || null,
         name,
@@ -208,9 +222,16 @@ export const createFood = async (req, res, next) => {
         is_vegetarian,
         is_vegan,
         is_gluten_free,
+        is_special,
+        is_recommended,
+        available_from === '' ? null : available_from,
+        available_until === '' ? null : available_until,
+        seasonal_start === '' ? null : seasonal_start,
+        seasonal_end === '' ? null : seasonal_end,
         calories || null,
         display_order,
       ]
+
     );
 
     const food = result.rows[0];
@@ -239,7 +260,8 @@ export const updateFood = async (req, res, next) => {
     const allowedFields = [
       'menu_id', 'name', 'description', 'price', 'image_url', 'spice_level',
       'preparation_time', 'is_available', 'is_vegetarian', 'is_vegan',
-      'is_gluten_free', 'calories', 'display_order'
+      'is_gluten_free', 'is_special', 'is_recommended', 'available_from',
+      'available_until', 'seasonal_start', 'seasonal_end', 'calories', 'display_order'
     ];
 
     const updates = [];
@@ -250,9 +272,16 @@ export const updateFood = async (req, res, next) => {
       if (updateFields[field] !== undefined) {
         paramCount++;
         updates.push(`${field} = $${paramCount}`);
-        values.push(updateFields[field]);
+
+        // Handle empty strings for optional date/time fields
+        let val = updateFields[field];
+        if (['available_from', 'available_until', 'seasonal_start', 'seasonal_end'].includes(field) && val === '') {
+          val = null;
+        }
+        values.push(val);
       }
     }
+
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
@@ -274,7 +303,7 @@ export const updateFood = async (req, res, next) => {
     if (updateFields.ingredient_ids) {
       // Remove existing ingredients
       await pool.query('DELETE FROM food_ingredients WHERE food_id = $1', [id]);
-      
+
       // Add new ingredients
       if (updateFields.ingredient_ids.length > 0) {
         for (const ingredientId of updateFields.ingredient_ids) {
@@ -304,6 +333,42 @@ export const deleteFood = async (req, res, next) => {
     }
 
     res.json({ message: 'Food deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// Get all ingredients
+export const getIngredients = async (req, res, next) => {
+  try {
+    const result = await pool.query('SELECT * FROM ingredients ORDER BY name');
+    res.json({ ingredients: result.rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create ingredient (Admin only)
+export const createIngredient = async (req, res, next) => {
+  try {
+    const { name, allergen_type } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
+
+    const result = await pool.query(
+      'INSERT INTO ingredients (name, allergen_type) VALUES ($1, $2) RETURNING *',
+      [name, allergen_type || null]
+    );
+    res.status(201).json({ message: 'Ingredient created', ingredient: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete ingredient (Admin only)
+export const deleteIngredient = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM ingredients WHERE id = $1', [id]);
+    res.json({ message: 'Ingredient deleted' });
   } catch (error) {
     next(error);
   }

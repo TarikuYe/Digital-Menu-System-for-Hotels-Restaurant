@@ -1,3 +1,4 @@
+
 -- Migration: Upgrade to Smart Digital Menu v2.0
 -- Adds support for Tables, Guest Sessions, and Order Tracking
 
