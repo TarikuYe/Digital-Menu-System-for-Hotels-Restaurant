@@ -58,8 +58,6 @@ export const foodsAPI = {
   deleteIngredient: (id) => api.delete(`/foods/ingredients/${id}`),
 };
 
-
-
 // Menus API
 export const menusAPI = {
   getAll: (params) => api.get('/menus', { params }),
@@ -89,7 +87,6 @@ export const feedbackAPI = {
   getInsights: () => api.get('/feedback/analytics/insights'),
 };
 
-
 // Guest API
 export const guestAPI = {
   verifyToken: (token) => api.get(`/guest/verify/${token}`),
@@ -115,11 +112,13 @@ export const settingsAPI = {
   updateProfile: (data) => api.put('/settings/profile', data),
 };
 
-
 // Kitchen API
 export const kitchenAPI = {
   getOrders: () => api.get('/kitchen/orders'),
-  updateStatus: (id, status) => api.patch(`/kitchen/orders/${id}/status`, { status }),
+  updateStatus: (id, data) => api.patch(`/kitchen/orders/${id}/status`, data),
+  updateInventory: (foodId, data) => api.patch(`/kitchen/inventory/${foodId}`, data),
+  logCheck: (data) => api.post('/kitchen/logs', data),
+  getStats: () => api.get('/kitchen/stats'),
 };
 
 // Manager API
@@ -205,13 +204,4 @@ export const integrationAPI = {
   toggleKey: (id, is_active) => api.patch(`/integrations/keys/${id}/status`, { is_active }),
 };
 
-
-
-
-
-
-
-
-
 export default api;
-

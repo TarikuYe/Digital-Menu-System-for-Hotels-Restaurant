@@ -15,7 +15,9 @@ export const ORDER_STATUS = {
   READY: 'ready',
   SERVED: 'served',
   CANCELLED: 'cancelled',
+  UNAVAILABLE: 'unavailable',
 };
+
 
 export const SPICE_LEVELS = {
   0: 'None',

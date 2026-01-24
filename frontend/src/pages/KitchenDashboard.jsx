@@ -1,165 +1,396 @@
 
 import React, { useState, useEffect } from 'react';
-import { kitchenAPI } from '../services/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Clock,
+    CheckCircle2,
+    AlertCircle,
+    Timer,
+    Users,
+    ChefHat,
+    Flame,
+    Utensils,
+    MoreVertical,
+    ArrowRight,
+    RefreshCw,
+    Wind,
+    ShieldCheck,
+    AlertTriangle,
+    History,
+    Info,
+    Activity
+} from 'lucide-react';
+
+import { kitchenAPI, foodsAPI } from '../services/api.js';
+import { ORDER_STATUS } from '../utils/constants.js';
 import toast from 'react-hot-toast';
-import { RefreshCw, Clock, CheckCircle, ChefHat, AlertCircle } from 'lucide-react';
 
 const KitchenDashboard = () => {
     const [orders, setOrders] = useState([]);
+    const [stats, setStats] = useState({ prepared_count: 0, avg_prep_time: 0 });
+    const [peakHour, setPeakHour] = useState(null);
+    const [kitchenLoad, setKitchenLoad] = useState('normal');
     const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
 
-    const fetchOrders = async () => {
+    const [activeFilter, setActiveFilter] = useState('all');
+    const [inventory, setInventory] = useState([]);
+    const [showLogModal, setShowLogModal] = useState(false);
+    const [logType, setLogType] = useState('hygiene');
+
+    const loadData = async () => {
         try {
-            setRefreshing(true);
-            const response = await kitchenAPI.getOrders();
-            setOrders(response.data);
+            setLoading(true);
+            const [orderRes, statRes, foodRes] = await Promise.all([
+                kitchenAPI.getOrders(),
+                kitchenAPI.getStats(),
+                foodsAPI.getAll()
+            ]);
+            setOrders(orderRes.data.orders);
+            setStats(statRes.data.stats);
+            setPeakHour(statRes.data.peak_hour);
+            setKitchenLoad(statRes.data.kitchen_load);
+            setInventory(foodRes.data.foods);
+
         } catch (error) {
-            console.error('Failed to fetch kitchen orders:', error);
-            toast.error('Failed to update orders');
+            toast.error('Failed to update kitchen feed');
         } finally {
             setLoading(false);
-            setRefreshing(false);
         }
     };
 
     useEffect(() => {
-        fetchOrders();
-        const interval = setInterval(fetchOrders, 30000); // Poll every 30s
+        loadData();
+        const interval = setInterval(loadData, 15000); // Polling every 15s for "real-time"
         return () => clearInterval(interval);
     }, []);
 
     const handleStatusUpdate = async (orderId, newStatus) => {
         try {
-            await kitchenAPI.updateStatus(orderId, newStatus);
-            toast.success(`Order updated to ${newStatus}`);
-            fetchOrders();
+            await kitchenAPI.updateStatus(orderId, { status: newStatus });
+            toast.success(`Order marked as ${newStatus}`);
+            loadData();
         } catch (error) {
-            console.error('Failed to update order status:', error);
-            toast.error('Failed to update status');
+            toast.error('Status update failed');
         }
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'pending': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-            case 'preparing': return 'bg-blue-100 border-blue-300 text-blue-800';
-            case 'ready': return 'bg-green-100 border-green-300 text-green-800';
-            default: return 'bg-gray-100 border-gray-300 text-gray-800';
+    const handlePrepTimeUpdate = async (orderId, time) => {
+        try {
+            await kitchenAPI.updateStatus(orderId, { estimated_prep_time: time });
+            toast.success(`ETC updated to ${time} mins`);
+            loadData();
+        } catch (error) {
+            toast.error('Update failed');
         }
     };
 
-    const calculateTimeElapsed = (dateString) => {
-        const start = new Date(dateString);
-        const now = new Date();
-        const diff = Math.floor((now - start) / 60000); // minutes
-        return `${diff} min`;
+    const toggleInventory = async (foodId, currentAvailable) => {
+        try {
+            await kitchenAPI.updateInventory(foodId, { is_available: !currentAvailable });
+            toast.success('Inventory updated');
+            loadData();
+        } catch (error) {
+            toast.error('Stock update failed');
+        }
     };
 
-    const OrderCard = ({ order }) => (
-        <div className={`p-4 rounded-lg border-2 shadow-sm mb-4 transition-all hover:shadow-md ${getStatusColor(order.status)}`}>
-            <div className="flex justify-between items-start mb-2 border-b border-black/10 pb-2">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                    Table {order.table_number}
-                </h3>
-                <span className="text-sm font-mono flex items-center gap-1">
-                    <Clock size={14} /> {calculateTimeElapsed(order.created_at)}
-                </span>
-            </div>
-
-            <div className="space-y-2 mb-4">
-                {order.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm">
-                        <span className="font-medium"><span className="inline-block w-6 text-center bg-white/50 rounded mr-1">{item.quantity}x</span> {item.food_name}</span>
-                    </div>
-                ))}
-                {order.special_instructions && (
-                    <div className="text-xs italic mt-2 p-1 bg-white/40 rounded">
-                        Note: {order.special_instructions}
-                    </div>
-                )}
-            </div>
-
-            <div className="flex gap-2 mt-4">
-                {order.status === 'pending' && (
-                    <button
-                        onClick={() => handleStatusUpdate(order.id, 'preparing')}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                    >
-                        <ChefHat size={16} /> Start Cooking
-                    </button>
-                )}
-                {order.status === 'preparing' && (
-                    <button
-                        onClick={() => handleStatusUpdate(order.id, 'ready')}
-                        className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 transition flex items-center justify-center gap-2"
-                    >
-                        <CheckCircle size={16} /> Mark Ready
-                    </button>
-                )}
-                {order.status === 'ready' && (
-                    <div className="w-full text-center text-sm font-bold opacity-75">Waiting for Pickup</div>
-                )}
-            </div>
-        </div>
-    );
-
-    const pendingOrders = orders.filter(o => o.status === 'pending');
-    const preparingOrders = orders.filter(o => o.status === 'preparing');
-    const readyOrders = orders.filter(o => o.status === 'ready');
-
-    if (loading) return <div className="p-8 text-center text-xl">Loading kitchen dashboard...</div>;
+    const getPriorityColor = (priority) => {
+        switch (priority) {
+            case 'urgent': return 'text-red-500 bg-red-500/10 border-red-500/20';
+            case 'high': return 'text-gold bg-gold/10 border-gold/20';
+            default: return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+        }
+    };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                    <ChefHat className="text-orange-600" /> Kitchen Display System
-                </h1>
-                <button
-                    onClick={fetchOrders}
-                    disabled={refreshing}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
-                >
-                    <RefreshCw size={20} className={refreshing ? 'animate-spin' : ''} />
-                    Refresh
-                </button>
+        <div className="min-h-screen bg-brand-dark text-white p-4 md:p-8 font-sans">
+            {/* Header Section */}
+            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+                <div>
+                    <h1 className="text-4xl font-display font-extrabold flex items-center gap-3">
+                        <ChefHat className="text-gold" size={40} />
+                        Kitchen <span className="text-gold">Display</span> System
+                    </h1>
+                    <p className="text-gray-500 font-medium uppercase tracking-[0.3em] text-[10px] mt-2 flex items-center gap-2">
+                        <Flame size={12} className="text-red-500 animate-pulse" /> Live Culinary Operations
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap gap-4 w-full lg:w-auto">
+                    <div className="glass-card flex items-center gap-4 px-6 py-3 border-l-4 border-gold bg-gold/5">
+                        <Timer className="text-gold" size={24} />
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Avg. Prep Time</p>
+                            <p className="text-xl font-black">{Math.round(stats.avg_prep_time || 0)} <span className="text-xs text-gray-400">min</span></p>
+                        </div>
+                    </div>
+                    <div className="glass-card flex items-center gap-4 px-6 py-3 border-l-4 border-blue-500 bg-blue-500/5">
+                        <Users className="text-blue-400" size={24} />
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Workload</p>
+                            <p className="text-xl font-black uppercase">{kitchenLoad}</p>
+                        </div>
+                    </div>
+                    <div className="glass-card hidden sm:flex items-center gap-4 px-6 py-3 border-l-4 border-purple-500 bg-purple-500/5">
+                        <Activity className="text-purple-400" size={24} />
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Peak Hour</p>
+                            <p className="text-xl font-black">{peakHour ? `${peakHour.peak_hour}:00` : '...'}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowLogModal(true)}
+                        className="premium-button !py-3 !px-8 flex items-center gap-2 text-xs uppercase tracking-widest"
+                    >
+                        <ShieldCheck size={16} /> Compliance Log
+                    </button>
+                </div>
+
+            </header>
+
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                {/* Active Orders Grid */}
+                <div className="xl:col-span-3 space-y-8">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-500 flex items-center gap-2">
+                            <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Active Preparation Pipeline
+                        </h2>
+                        <div className="flex gap-2">
+                            {['all', 'pending', 'preparing', 'urgent'].map(filter => (
+                                <button
+                                    key={filter}
+                                    onClick={() => setActiveFilter(filter)}
+                                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter transition-all
+                    ${activeFilter === filter ? 'bg-gold text-black' : 'bg-white/5 text-gray-500 hover:text-white'}`}
+                                >
+                                    {filter}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <AnimatePresence>
+                            {orders
+                                .filter(o => activeFilter === 'all' || o.status === activeFilter || (activeFilter === 'urgent' && o.priority === 'urgent'))
+                                .map((order, index) => (
+                                    <motion.div
+                                        key={order.id}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        className={`glass-card overflow-hidden group border-t-4 
+                    ${order.status === 'preparing' ? 'border-gold' : 'border-blue-500/30'}`}
+                                    >
+                                        {/* Order Card Header */}
+                                        <div className="p-5 bg-white/2 border-b border-white/5 flex justify-between items-start">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xl font-black font-display tracking-tighter">#{order.table_number || 'DEL'}</span>
+                                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border ${getPriorityColor(order.priority)}`}>
+                                                        {order.priority}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-gray-500 font-bold flex items-center gap-1 uppercase tracking-widest">
+                                                    <Clock size={10} /> {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-black uppercase text-gold leading-none">{order.status}</p>
+                                                <p className="text-[9px] text-gray-600 mt-1 uppercase truncate max-w-[80px]">{order.customer_name || 'Guest'}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Order Items */}
+                                        <div className="p-5 space-y-4 max-h-[300px] overflow-y-auto">
+                                            {order.items.map(item => (
+                                                <div key={item.id} className="flex gap-3">
+                                                    <div className="text-gold font-black text-lg">x{item.quantity}</div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-bold leading-none mb-1">{item.food_name}</p>
+                                                        {item.special_instructions && (
+                                                            <div className="flex items-start gap-1 p-1.5 rounded-lg bg-red-500/5 border border-red-500/10">
+                                                                <AlertCircle size={10} className="text-red-500 mt-0.5 shrink-0" />
+                                                                <p className="text-[10px] text-red-300 italic">{item.special_instructions}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {order.special_instructions && (
+                                                <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 text-[10px] text-blue-300 italic flex items-start gap-2">
+                                                    <Info size={12} className="shrink-0" />
+                                                    <span>Global Note: {order.special_instructions}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Actions Footer */}
+                                        <div className="p-4 bg-black/20 border-t border-white/5 space-y-3">
+                                            <div className="flex gap-2">
+                                                <select
+                                                    onChange={(e) => handlePrepTimeUpdate(order.id, e.target.value)}
+                                                    className="bg-brand-dark border border-white/10 rounded-lg text-[9px] font-black uppercase p-2 flex-1 text-center outline-none focus:border-gold"
+                                                    value={order.estimated_prep_time || ""}
+                                                >
+                                                    <option value="">Set ETC</option>
+                                                    {[5, 10, 15, 20, 30, 45].map(m => <option key={m} value={m}>{m} MIN</option>)}
+                                                </select>
+
+                                                {order.status !== 'ready' && (
+                                                    <div className="flex gap-2 flex-[2]">
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(order.id, 'unavailable')}
+                                                            className="p-2.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                                                            title="Cannot Prepare"
+                                                        >
+                                                            <AlertTriangle size={14} />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(order.id, order.status === 'pending' || order.status === 'confirmed' ? 'preparing' : 'ready')}
+                                                            className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2
+                                                            ${order.status === 'preparing' ? 'bg-green-500 text-black shadow-lg shadow-green-500/20' : 'bg-gold text-black shadow-lg shadow-gold/20'}`}
+                                                        >
+                                                            {order.status === 'preparing' ? <><CheckCircle2 size={14} /> Ready</> : <><RefreshCw size={14} /> Start</>}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                        </AnimatePresence>
+                        {orders.length === 0 && (
+                            <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-600">
+                                <Wind size={60} strokeWidth={1} className="mb-4 opacity-20" />
+                                <p className="font-display text-xl font-bold uppercase tracking-widest opacity-40">Kitchen Order Path Clear</p>
+                                <p className="text-xs uppercase tracking-tighter mt-2 font-black">All stations currently idle</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Inventory & Sidebar */}
+                <div className="space-y-8">
+                    <div className="glass-card flex flex-col h-full bg-brand-dark/50">
+                        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/2">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <Utensils size={14} /> Stock Alerts
+                            </h3>
+                            <p className="text-[9px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full font-black">LIVE</p>
+                        </div>
+                        <div className="p-4 space-y-3 overflow-y-auto max-h-[50vh]">
+                            {inventory.map(item => (
+                                <div key={item.id} className="flex justify-between items-center p-3 rounded-xl bg-white/2 border border-white/5 group hover:bg-white/5 transition-all">
+                                    <div className="flex-1 min-w-0 mr-3">
+                                        <p className={`text-xs font-bold truncate ${!item.is_available ? 'text-gray-600 line-through' : ''}`}>{item.name}</p>
+                                        {item.is_low_stock && <p className="text-[8px] font-black uppercase text-red-500">Low Stock Alert</p>}
+                                    </div>
+                                    <button
+                                        onClick={() => toggleInventory(item.id, item.is_available)}
+                                        className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all
+                      ${item.is_available ? 'bg-white/5 text-gray-400 hover:bg-red-500/10 hover:text-red-500' : 'bg-red-500 text-white shadow-lg shadow-red-500/20'}`}
+                                    >
+                                        {item.is_available ? 'Stock Normal' : 'Out of Stock'}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-6 mt-auto border-t border-white/5 bg-black/40">
+                            <div className="space-y-4">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500 text-center">Kitchen Reports</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col items-center gap-2 hover:bg-white/10 transition-all">
+                                        <AlertTriangle size={16} className="text-gold" />
+                                        <span className="text-[8px] font-black uppercase">Report Delay</span>
+                                    </button>
+                                    <button className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col items-center gap-2 hover:bg-white/10 transition-all">
+                                        <Users size={16} className="text-blue-400" />
+                                        <span className="text-[8px] font-black uppercase">Pantry Sync</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="glass-card p-6 border-l-4 border-blue-500 bg-blue-500/5">
+                        <div className="flex items-center gap-3 mb-4">
+                            <History className="text-blue-400" size={20} />
+                            <h3 className="text-sm font-bold">Shift Log</h3>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed mb-4">
+                            Shift started at 18:00. <br />
+                            Head Chef: Mark S.
+                        </p>
+                        <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest pb-2 border-b border-white/5 mb-3">Recent Logs</div>
+                        <div className="space-y-2 opacity-60">
+                            <div className="flex justify-between text-[9px]">
+                                <span>Pantry Check</span>
+                                <span className="text-green-500 font-bold">Passed</span>
+                            </div>
+                            <div className="flex justify-between text-[9px]">
+                                <span>Cooler Temp</span>
+                                <span className="text-gold font-bold">4.2°C</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Pending Column */}
-                <div className="bg-gray-50 p-4 rounded-xl min-h-[600px] border border-gray-200">
-                    <h2 className="text-xl font-bold mb-4 text-yellow-700 flex items-center gap-2">
-                        <AlertCircle size={20} /> New Orders ({pendingOrders.length})
-                    </h2>
-                    <div className="space-y-4">
-                        {pendingOrders.length === 0 && <p className="text-gray-400 text-center py-8">No new orders</p>}
-                        {pendingOrders.map(order => <OrderCard key={order.id} order={order} />)}
-                    </div>
-                </div>
+            {/* Log Modal */}
+            <AnimatePresence>
+                {showLogModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+                            className="glass-card p-8 w-full max-w-md border-t-8 border-gold"
+                        >
+                            <h2 className="text-2xl font-bold font-display mb-2">Compliance Log</h2>
+                            <p className="text-xs text-gray-400 mb-6">Log kitchen incidents or safety checks for administrative overview.</p>
 
-                {/* Preparing Column */}
-                <div className="bg-gray-50 p-4 rounded-xl min-h-[600px] border border-gray-200">
-                    <h2 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
-                        <ChefHat size={20} /> In Preparation ({preparingOrders.length})
-                    </h2>
-                    <div className="space-y-4">
-                        {preparingOrders.length === 0 && <p className="text-gray-400 text-center py-8">Nothing cooking currently</p>}
-                        {preparingOrders.map(order => <OrderCard key={order.id} order={order} />)}
-                    </div>
-                </div>
+                            <div className="space-y-4">
+                                <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/5 mb-4">
+                                    {['hygiene', 'safety', 'incident'].map(type => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setLogType(type)}
+                                            className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase transition-all
+                        ${logType === type ? 'bg-gold text-black' : 'text-gray-500 hover:text-white'}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
 
-                {/* Ready Column */}
-                <div className="bg-gray-50 p-4 rounded-xl min-h-[600px] border border-gray-200">
-                    <h2 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
-                        <CheckCircle size={20} /> Ready to Serve ({readyOrders.length})
-                    </h2>
-                    <div className="space-y-4">
-                        {readyOrders.length === 0 && <p className="text-gray-400 text-center py-8">No ready orders</p>}
-                        {readyOrders.map(order => <OrderCard key={order.id} order={order} />)}
-                    </div>
-                </div>
-            </div>
+                                <textarea
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none h-32 text-sm"
+                                    placeholder="Provide specific details about the check or incident..."
+                                />
+
+                                <div className="flex gap-4">
+                                    <button onClick={() => setShowLogModal(false)} className="flex-1 py-4 text-xs font-black uppercase tracking-widest hover:text-white text-gray-500">Cancel</button>
+                                    <button
+                                        onClick={() => {
+                                            toast.success('Shift log recorded');
+                                            setShowLogModal(false);
+                                        }}
+                                        className="flex-1 premium-button !rounded-xl !py-4 text-xs uppercase"
+                                    >
+                                        Submit Entry
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
