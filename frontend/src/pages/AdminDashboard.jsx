@@ -28,11 +28,34 @@ import {
   PieChart,
   TrendingUp,
   Activity,
-  Brain,
-  MessageCircle
+  MessageCircle,
+  Bell,
+  Megaphone,
+  Send,
+  Store,
+  Layout,
+  QrCode,
+  Shield,
+  HardDrive,
+  Lock,
+  Building2,
+  MapPin,
+  Share2,
+  Database,
+  Key,
+  Link
 } from 'lucide-react';
 
-import { foodsAPI, menusAPI, feedbackAPI, ordersAPI, adminAPI, localizationAPI, paymentsAPI, analyticsAPI } from '../services/api.js';
+import {
+  foodsAPI, menusAPI, feedbackAPI, ordersAPI, adminAPI, localizationAPI,
+  paymentsAPI, analyticsAPI, communicationAPI, settingsAPI, tablesAPI,
+  auditAPI, branchAPI, exportAPI, integrationAPI
+} from '../services/api.js';
+
+
+
+
+
 
 
 
@@ -56,7 +79,22 @@ const AdminDashboard = () => {
   const [analyticsSales, setAnalyticsSales] = useState(null);
   const [analyticsBehavior, setAnalyticsBehavior] = useState(null);
   const [feedbackInsights, setFeedbackInsights] = useState(null);
+  const [announcements, setAnnouncements] = useState([]);
+  const [commSettings, setCommSettings] = useState({});
+  const [resProfile, setResProfile] = useState(null);
+  const [systemSettings, setSystemSettings] = useState({});
+  const [tables, setTables] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [securityInsights, setSecurityInsights] = useState(null);
+  const [branches, setBranches] = useState([]);
+  const [branchPerformance, setBranchPerformance] = useState([]);
+  const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(false);
+
+
+
+
+
 
 
   const [payments, setPayments] = useState([]);
@@ -104,14 +142,35 @@ const AdminDashboard = () => {
     password: '',
     full_name: '',
     role: USER_ROLES.STAFF,
-    phone: ''
+    phone: '',
+    branch_id: ''
   };
+
 
   const [formData, setFormData] = useState(initialFoodState);
 
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  const handleExport = async (apiCall, fileName) => {
+    try {
+      toast.loading('Preparing export...', { id: 'export' });
+      const response = await apiCall();
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Generated successfully!', { id: 'export' });
+    } catch (error) {
+      console.error(error);
+      toast.error('Export failed', { id: 'export' });
+    }
+  };
+
 
   useEffect(() => {
     if (activeTab === 'settings' && settingsSubTab === 'translations' && selectedLanguage) {
@@ -154,13 +213,45 @@ const AdminDashboard = () => {
         const response = await adminAPI.getUsers();
         setUsers(response.data.users);
       } else if (activeTab === 'settings') {
-        const response = await localizationAPI.getLanguages();
-        setLanguages(response.data.languages);
-        if (!selectedLanguage && response.data.languages.length > 0) {
-          const def = response.data.languages.find(l => l.is_default) || response.data.languages[0];
+        const [langRes, profRes, setRes] = await Promise.all([
+          localizationAPI.getLanguages(),
+          settingsAPI.getProfile(),
+          settingsAPI.getAll()
+        ]);
+        setLanguages(langRes.data.languages);
+        setResProfile(profRes.data.profile);
+        setSystemSettings(setRes.data.settings);
+
+        if (!selectedLanguage && langRes.data.languages.length > 0) {
+          const def = langRes.data.languages.find(l => l.is_default) || langRes.data.languages[0];
           setSelectedLanguage(def);
         }
-      } else if (activeTab === 'payments') {
+
+        // Fetch tables if we are in the tables management sub-tab (or just fetch them anyway)
+        const tableRes = await tablesAPI.getAll();
+        setTables(tableRes.data.tables);
+      } else if (activeTab === 'security') {
+        const [logRes, insightRes] = await Promise.all([
+          auditAPI.getLogs(),
+          auditAPI.getInsights()
+        ]);
+        setAuditLogs(logRes.data.logs);
+        setSecurityInsights(insightRes.data);
+      } else if (activeTab === 'branches') {
+        const [branchRes, perfRes] = await Promise.all([
+          branchAPI.getAll(),
+          branchAPI.getPerformance()
+        ]);
+        setBranches(branchRes.data.branches);
+        setBranchPerformance(perfRes.data.performance);
+      } else if (activeTab === 'integrations') {
+        const response = await integrationAPI.getKeys();
+        setApiKeys(response.data.keys);
+      }
+
+
+
+      else if (activeTab === 'payments') {
         const [payRes, statRes] = await Promise.all([
           paymentsAPI.getPayments(),
           paymentsAPI.getStats()
@@ -174,7 +265,15 @@ const AdminDashboard = () => {
         ]);
         setAnalyticsSales(salesRes.data);
         setAnalyticsBehavior(behaviorRes.data);
+      } else if (activeTab === 'communications') {
+        const [announceRes, settingsRes] = await Promise.all([
+          communicationAPI.getAnnouncements(),
+          communicationAPI.getSettings()
+        ]);
+        setAnnouncements(announceRes.data.announcements);
+        setCommSettings(settingsRes.data.settings);
       }
+
 
 
 
@@ -296,8 +395,16 @@ const AdminDashboard = () => {
     { id: 'feedback', label: 'Performance & Feedback', icon: <MessageSquare size={18} /> },
     { id: 'payments', label: 'Finance & Payments', icon: <DollarSign size={18} /> },
     { id: 'analytics', label: 'Reports & Analytics', icon: <BarChart3 size={18} /> },
+    { id: 'communications', label: 'Notifications', icon: <Bell size={18} /> },
+    { id: 'branches', label: 'Multi-Branch', icon: <Building2 size={18} /> },
+    { id: 'integrations', label: 'Integrations', icon: <Link size={18} /> },
+    { id: 'security', label: 'Security & Audit', icon: <Shield size={18} /> },
+
+
     { id: 'settings', label: 'System Settings', icon: <Settings size={18} /> },
   ];
+
+
 
 
 
@@ -348,8 +455,35 @@ const AdminDashboard = () => {
               <Plus size={16} /> New Staff
             </button>
           )}
-          {activeTab === 'settings' && (
 
+          {activeTab === 'orders' && (
+            <button
+              onClick={() => handleExport(exportAPI.downloadOrders, 'orders_export.csv')}
+              className="px-6 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+            >
+              <Download size={16} /> Export CSV
+            </button>
+          )}
+
+          {activeTab === 'feedback' && (
+            <button
+              onClick={() => handleExport(exportAPI.downloadFeedback, 'feedback_export.csv')}
+              className="px-6 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+            >
+              <Download size={16} /> Export CSV
+            </button>
+          )}
+
+          {activeTab === 'analytics' && (
+            <button
+              onClick={() => handleExport(exportAPI.downloadSales, 'sales_analytics.csv')}
+              className="px-6 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2"
+            >
+              <Download size={16} /> Export Data
+            </button>
+          )}
+
+          {activeTab === 'settings' && (
             <button
               onClick={() => {
                 const name = prompt('Language Name (e.g. Amharic):');
@@ -362,8 +496,9 @@ const AdminDashboard = () => {
             </button>
           )}
         </div>
-
       </header>
+
+
 
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Navigation Sidebar */}
@@ -1133,7 +1268,486 @@ const AdminDashboard = () => {
                 {/* System Settings & Localization View */}
 
 
+                {/* Notifications & Communication View */}
+                {activeTab === 'communications' && (
+                  <div className="space-y-8">
+                    {/* Communication Control Center */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      {/* Announcement Composer */}
+                      <div className="lg:col-span-2 glass-card p-8 border-t-4 border-gold">
+                        <div className="flex items-center gap-3 mb-8">
+                          <Megaphone className="text-gold" size={24} />
+                          <h3 className="text-2xl font-bold font-display">Broadcast Center</h3>
+                        </div>
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Target Audience</label>
+                              <select
+                                id="announce-role"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-gold outline-none transition-all"
+                              >
+                                <option value="all">Everyone (Global)</option>
+                                <option value="staff">Staff Only</option>
+                                <option value="kitchen">Kitchen Staff</option>
+                                <option value="customer">Customers Only</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Priority Level</label>
+                              <select
+                                id="announce-priority"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-gold outline-none transition-all"
+                              >
+                                <option value="info">Information (Blue)</option>
+                                <option value="warning">Warning (Yellow)</option>
+                                <option value="urgent">Urgent (Red)</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Announcement Title</label>
+                            <input
+                              id="announce-title"
+                              placeholder="System Maintenance, New Dish Release..."
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-gold outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Message Content Content Content</label>
+                            <textarea
+                              id="announce-content"
+                              rows={4}
+                              placeholder="Write your announcement message here..."
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:border-gold outline-none transition-all resize-none"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const title = document.getElementById('announce-title').value;
+                              const content = document.getElementById('announce-content').value;
+                              const target_role = document.getElementById('announce-role').value;
+                              const priority = document.getElementById('announce-priority').value;
+
+                              if (title && content) {
+                                communicationAPI.createAnnouncement({ title, content, target_role, priority }).then(() => {
+                                  toast.success('Announcement broadcasted!');
+                                  document.getElementById('announce-title').value = '';
+                                  document.getElementById('announce-content').value = '';
+                                  loadData();
+                                });
+                              }
+                            }}
+                            className="premium-button w-full !py-4 flex justify-center items-center gap-2 text-sm uppercase tracking-[0.2em] font-black"
+                          >
+                            <Send size={18} /> Broadcast Now
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Notification Settings */}
+                      <div className="glass-card p-8 h-fit">
+                        <div className="flex items-center gap-3 mb-8">
+                          <Settings className="text-gray-400" size={20} />
+                          <h3 className="text-lg font-bold font-display">Alert Preferences</h3>
+                        </div>
+                        <div className="space-y-6">
+                          {[
+                            { key: 'notify_email', label: 'Email Notifications', desc: 'Summary of daily reports' },
+                            { key: 'notify_sms', label: 'Urgent SMS Alerts', desc: 'For cancelled or delayed orders' },
+                            { key: 'notify_push', label: 'In-App Push', desc: 'Real-time kitchen feedback' },
+                            { key: 'order_status_alerts', label: 'Smart Status Updates', desc: 'AI-timed customer alerts' }
+                          ].map(setting => (
+                            <label key={setting.key} className="flex items-start gap-4 p-4 rounded-2xl bg-white/2 border border-white/5 hover:bg-white/5 transition-all cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                className="mt-1 w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
+                                checked={commSettings[setting.key] === 'true'}
+                                onChange={(e) => {
+                                  const newSettings = { [setting.key]: e.target.checked.toString() };
+                                  communicationAPI.updateSettings({ settings: newSettings }).then(loadData);
+                                }}
+                              />
+                              <div>
+                                <p className="text-xs font-bold text-white mb-0.5">{setting.label}</p>
+                                <p className="text-[10px] text-gray-500 font-medium">{setting.desc}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Announcement History */}
+                    <div className="glass-card overflow-hidden">
+                      <div className="p-6 border-b border-white/5 bg-white/2">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                          <Clock size={14} /> Active Broadcast History
+                        </h3>
+                      </div>
+                      <div className="divide-y divide-white/5">
+                        {announcements.length === 0 && <div className="p-12 text-center text-gray-500 italic">No previous announcements found.</div>}
+                        {announcements.map(item => (
+                          <div key={item.id} className="p-6 flex justify-between items-start hover:bg-white/2 transition-all">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter
+                                  ${item.priority === 'urgent' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                  {item.priority}
+                                </span>
+                                <h4 className="text-sm font-bold text-white">{item.title}</h4>
+                              </div>
+                              <p className="text-xs text-gray-400 leading-relaxed max-w-2xl">{item.content}</p>
+                              <div className="flex items-center gap-4 text-[9px] font-bold uppercase tracking-widest text-gray-600">
+                                <span className="flex items-center gap-1"><Users size={10} /> To: {item.target_role}</span>
+                                <span><Calendar size={10} /> {new Date(item.created_at).toLocaleDateString()}</span>
+                                <span className="text-gray-700">By: {item.sender_name}</span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => communicationAPI.deleteAnnouncement(item.id).then(loadData)}
+                              className="p-2 text-gray-600 hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Multi-Branch & Scalability Management View */}
+                {activeTab === 'branches' && (
+                  <div className="space-y-12">
+                    {/* Multi-Branch Performance Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      {branchPerformance.map(perf => (
+                        <div key={perf.id} className="glass-card p-6 border-l-4 border-gold bg-gold/5">
+                          <h4 className="text-lg font-bold mb-4 flex justify-between items-center">
+                            {perf.name}
+                            <div className="p-1.5 bg-gold/10 text-gold rounded-lg"><TrendingUp size={16} /></div>
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black uppercase text-gray-500">Revenue</p>
+                              <p className="text-xl font-black text-white">${parseFloat(perf.total_revenue).toFixed(0)}</p>
+                            </div>
+                            <div className="space-y-1 text-right">
+                              <p className="text-[10px] font-black uppercase text-gray-500">Orders</p>
+                              <p className="text-xl font-black text-white">{perf.total_orders}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Branch Management List */}
+                    <div className="space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-2xl font-bold font-display">Branch Network</h3>
+                        <button
+                          onClick={() => {
+                            const name = prompt('Branch Name:');
+                            if (name) branchAPI.create({ name }).then(loadData);
+                          }}
+                          className="premium-button !py-2 !px-8 text-xs uppercase"
+                        >
+                          Establish New Branch
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {branches.map(branch => (
+                          <div key={branch.id} className="glass-card p-8 group relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => confirm('Suspend Branch?') && branchAPI.delete(branch.id).then(loadData)}
+                                className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-4 mb-6">
+                              <div className="p-4 bg-brand-dark rounded-2xl border border-white/10 group-hover:border-gold transition-all">
+                                <Building2 className="text-gold" size={32} />
+                              </div>
+                              <div>
+                                <h4 className="text-xl font-bold">{branch.name}</h4>
+                                <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin size={12} /> {branch.city || 'Location Pending'}</p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-4 pt-6 border-t border-white/5">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Currency</span>
+                                <span className="text-white font-mono">{branch.currency || 'USD'}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Contact</span>
+                                <span className="text-white">{branch.phone || 'N/A'}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Status</span>
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${branch.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                  {branch.is_active ? 'Operational' : 'Suspended'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                const newName = prompt('Rename Branch:', branch.name);
+                                if (newName) branchAPI.update(branch.id, { name: newName }).then(loadData);
+                              }}
+                              className="w-full mt-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                            >
+                              Configure Branch
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Export & Integration View */}
+                {activeTab === 'integrations' && (
+                  <div className="space-y-8">
+                    {/* Integration Overview */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="glass-card p-8 border-t-4 border-gold bg-gold/5">
+                        <div className="flex items-center gap-3 mb-6">
+                          <Share2 className="text-gold" size={24} />
+                          <h3 className="text-xl font-bold font-display">API Access Management</h3>
+                        </div>
+                        <p className="text-xs text-gray-400 leading-relaxed mb-8 italic">
+                          Grant third-party systems access to your restaurant ecosystem. Manage secure keys for POS integrations, accounting software, and custom mobile apps.
+                        </p>
+                        <button
+                          onClick={() => {
+                            const name = prompt('Application Name (e.g. QuickBooks Integration):');
+                            if (name) {
+                              integrationAPI.createKey({ key_name: name, permissions: { read: true, write: false } }).then(res => {
+                                alert(`IMPORTANT: Your API Key is: ${res.data.key}\n\nPlease copy and store it somewhere safe. It will NEVER be shown again.`);
+                                loadData();
+                              });
+                            }
+                          }}
+                          className="premium-button !py-4 flex justify-center items-center gap-2 text-xs uppercase tracking-widest"
+                        >
+                          <Key size={16} /> Generate New API Key
+                        </button>
+                      </div>
+
+                      <div className="glass-card p-8 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center gap-3 mb-6">
+                            <Database className="text-blue-400" size={24} />
+                            <h3 className="text-xl font-bold font-display">Bulk Data Handlers</h3>
+                          </div>
+                          <div className="space-y-4">
+                            {[
+                              { label: 'Order History Matrix', file: 'orders_historical.csv', api: exportAPI.downloadOrders },
+                              { label: 'Customer Sentiment Ledger', file: 'feedback_comprehensive.csv', api: exportAPI.downloadFeedback },
+                              { label: 'Sales & Revenue Aggregates', file: 'sales_performance.csv', api: exportAPI.downloadSales }
+                            ].map(item => (
+                              <div key={item.label} className="flex justify-between items-center p-4 rounded-xl bg-white/2 border border-white/5 hover:bg-white/5 transition-all">
+                                <span className="text-xs font-bold text-gray-300">{item.label}</span>
+                                <button
+                                  onClick={() => handleExport(item.api, item.file)}
+                                  className="text-[10px] font-black uppercase text-gold hover:underline flex items-center gap-1"
+                                >
+                                  <Download size={12} /> CSV
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-[9px] text-gray-600 mt-6 uppercase tracking-[0.2em] font-black text-center">Standard ISO-8601 Data Formats</p>
+                      </div>
+                    </div>
+
+                    {/* API Key List */}
+                    <div className="glass-card overflow-hidden">
+                      <div className="p-6 border-b border-white/5 bg-white/2 flex justify-between items-center">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                          <Lock size={14} /> Active Application Keys
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b border-white/5">
+                              <th className="p-4">Integration Name</th>
+                              <th className="p-4">Permissions</th>
+                              <th className="p-4">Created At</th>
+                              <th className="p-4">Last Sync</th>
+                              <th className="p-4">Status</th>
+                              <th className="p-4">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {apiKeys.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="p-12 text-center text-gray-600 italic text-xs">No active integrations found.</td>
+                              </tr>
+                            )}
+                            {apiKeys.map(key => (
+                              <tr key={key.id} className="text-xs hover:bg-white/2 transition-colors">
+                                <td className="p-4">
+                                  <div className="font-bold text-white">{key.key_name}</div>
+                                  <div className="text-[9px] font-mono text-gray-500 uppercase">UID: {key.id.split('-')[0]}...</div>
+                                </td>
+                                <td className="p-4">
+                                  <div className="flex gap-1">
+                                    {Object.entries(key.permissions).map(([perm, val]) => val && (
+                                      <span key={perm} className="px-2 py-0.5 bg-white/5 border border-white/5 rounded text-[8px] uppercase font-black">{perm}</span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-gray-400">{new Date(key.created_at).toLocaleDateString()}</td>
+                                <td className="p-4 font-mono text-[10px] text-gray-500">{key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never Sync'}</td>
+                                <td className="p-4">
+                                  <button
+                                    onClick={() => integrationAPI.toggleKey(key.id, !key.is_active).then(loadData)}
+                                    className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase transition-all
+                                      ${key.is_active ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}
+                                  >
+                                    {key.is_active ? 'Active' : 'Revoked'}
+                                  </button>
+                                </td>
+                                <td className="p-4">
+                                  <button
+                                    onClick={() => confirm('Permanently delete this key?') && integrationAPI.deleteKey(key.id).then(loadData)}
+                                    className="p-2 text-gray-600 hover:text-red-500 transition-colors"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
+                {/* Security & Audit Management View */}
+                {activeTab === 'security' && (
+                  <div className="space-y-8">
+                    {/* Threat Detection & Insights */}
+                    {securityInsights && (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="glass-card p-6 border-l-4 border-red-500 bg-red-500/5">
+                          <div className="flex items-center gap-3 mb-6">
+                            <AlertCircle className="text-red-500" size={24} />
+                            <h3 className="text-lg font-bold font-display">Brute Force Alerts</h3>
+                          </div>
+                          <div className="space-y-4">
+                            {securityInsights.failedLogins.length === 0 ? (
+                              <p className="text-xs text-gray-500">No suspicious login attempts detected.</p>
+                            ) : (
+                              securityInsights.failedLogins.map((item, i) => (
+                                <div key={i} className="flex justify-between items-center text-sm p-2 bg-red-500/10 rounded-lg">
+                                  <span className="font-mono text-[10px]">{item.ip_address}</span>
+                                  <span className="text-red-400 font-bold">{item.attempt_count} failures</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="glass-card p-6 border-l-4 border-gold bg-gold/5">
+                          <div className="flex items-center gap-3 mb-6">
+                            <Lock className="text-gold" size={24} />
+                            <h3 className="text-lg font-bold font-display">Role Privilege Changes</h3>
+                          </div>
+                          <div className="space-y-3">
+                            {securityInsights.roleChanges.map((log, i) => (
+                              <div key={i} className="text-xs">
+                                <p className="font-bold text-white">{log.actor_name}</p>
+                                <p className="text-gray-500">{log.details.email}: {log.details.old_role} → {log.details.new_role}</p>
+                              </div>
+                            ))}
+                            {securityInsights.roleChanges.length === 0 && <p className="text-xs text-gray-500 italic">No role escalations in 7 days.</p>}
+                          </div>
+                        </div>
+
+                        <div className="glass-card p-6 border-l-4 border-blue-500 bg-blue-500/5 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center gap-3 mb-6">
+                              <HardDrive className="text-blue-400" size={24} />
+                              <h3 className="text-lg font-bold font-display">System Resilience</h3>
+                            </div>
+                            <p className="text-xs text-gray-400 leading-relaxed mb-6">
+                              Secure your restaurant data with automated snapshots. Backups include menus, user roles, financial records, and feedback history.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => auditAPI.triggerBackup().then(res => toast.success(res.data.message))}
+                            className="w-full py-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-blue-500/20"
+                          >
+                            Initiate Vault Backup
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* System Activity Log */}
+                    <div className="glass-card overflow-hidden">
+                      <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/2">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                          <Activity size={14} /> Comprehensive Audit Trail
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b border-white/5">
+                              <th className="p-4">Timestamp</th>
+                              <th className="p-4">Principal</th>
+                              <th className="p-4">Action</th>
+                              <th className="p-4">Resources</th>
+                              <th className="p-4">IP Address</th>
+                              <th className="p-4">Severity</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {auditLogs.map(log => (
+                              <tr key={log.id} className="text-xs hover:bg-white/2 transition-colors">
+                                <td className="p-4 font-mono text-[10px] text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
+                                <td className="p-4">
+                                  <div className="font-bold">{log.user_name || 'System'}</div>
+                                  <div className="text-[10px] text-gray-500">{log.user_email || 'automated@service'}</div>
+                                </td>
+                                <td className="p-4">
+                                  <span className="font-black uppercase tracking-tighter text-white">{log.action.replace(/_/g, ' ')}</span>
+                                </td>
+                                <td className="p-4 italic text-gray-400">{log.entity_type || 'N/A'}</td>
+                                <td className="p-4 font-mono text-[10px]">{log.ip_address || 'Internal'}</td>
+                                <td className="p-4">
+                                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase 
+                                    ${log.severity === 'critical' ? 'bg-red-500 text-white' :
+                                      log.severity === 'warning' ? 'bg-gold text-black' : 'bg-white/10 text-gray-400'}`}>
+                                    {log.severity}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
                 {activeTab === 'settings' && (
+
+
                   <div className="space-y-8">
                     {/* Sub-navigation */}
                     <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl w-fit border border-white/5">
@@ -1151,7 +1765,22 @@ const AdminDashboard = () => {
                       >
                         Menu Translations
                       </button>
+                      <button
+                        onClick={() => setSettingsSubTab('profile')}
+                        className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all
+                          ${settingsSubTab === 'profile' ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Restaurant Profile
+                      </button>
+                      <button
+                        onClick={() => setSettingsSubTab('tables')}
+                        className={`px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all
+                          ${settingsSubTab === 'tables' ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        Table Management
+                      </button>
                     </div>
+
 
                     {settingsSubTab === 'languages' && (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1276,8 +1905,144 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                     )}
+
+                    {settingsSubTab === 'profile' && resProfile && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Profile Info */}
+                        <div className="glass-card p-8 space-y-6">
+                          <h3 className="text-xl font-bold font-display flex items-center gap-2">
+                            <Store className="text-gold" size={24} /> Restaurant Identity
+                          </h3>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-gray-500">Business Name</label>
+                                <input
+                                  defaultValue={resProfile.name}
+                                  onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, name: e.target.value }).then(loadData)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-gray-500">Primary Email</label>
+                                <input
+                                  defaultValue={resProfile.email}
+                                  onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, email: e.target.value }).then(loadData)}
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase text-gray-500">Physical Address</label>
+                              <textarea
+                                defaultValue={resProfile.address}
+                                onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, address: e.target.value }).then(loadData)}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none resize-none"
+                                rows={2}
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-gray-500">City</label>
+                                <input defaultValue={resProfile.city} onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, city: e.target.value }).then(loadData)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-gray-500">Currency</label>
+                                <input defaultValue={resProfile.currency} onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, currency: e.target.value }).then(loadData)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-gray-500">Phone</label>
+                                <input defaultValue={resProfile.phone} onBlur={(e) => settingsAPI.updateProfile({ ...resProfile, phone: e.target.value }).then(loadData)} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* System Modules & Taxes */}
+                        <div className="space-y-8">
+                          <div className="glass-card p-8">
+                            <h3 className="text-xl font-bold font-display flex items-center gap-2 mb-6">
+                              <DollarSign size={20} className="text-gold" /> Rates & Taxes
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                              {['tax_rate', 'service_charge'].map(key => (
+                                <div key={key} className="space-y-1">
+                                  <label className="text-[10px] font-black uppercase text-gray-500">{key.replace('_', ' ')} (%)</label>
+                                  <input
+                                    type="number" step="0.01"
+                                    defaultValue={systemSettings[key]?.value || 0}
+                                    onBlur={(e) => settingsAPI.update({ [key]: e.target.value }).then(loadData)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm focus:border-gold outline-none font-mono"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="glass-card p-8">
+                            <h3 className="text-xl font-bold font-display flex items-center gap-2 mb-6">
+                              <Layout size={20} className="text-blue-400" /> System Modules
+                            </h3>
+                            <div className="space-y-4">
+                              {[
+                                { key: 'enable_guest_ordering', label: 'Guest QR Ordering' },
+                                { key: 'enable_online_payment', label: 'Online Payments' },
+                                { key: 'enable_feedback_ai', label: 'AI Feedback Analysis' }
+                              ].map(module => (
+                                <label key={module.key} className="flex justify-between items-center p-3 rounded-xl bg-white/2 border border-white/5 cursor-pointer hover:bg-white/5 transition-all">
+                                  <span className="text-xs font-bold text-gray-300">{module.label}</span>
+                                  <div
+                                    onClick={() => {
+                                      const newVal = systemSettings[module.key]?.value === 'true' ? 'false' : 'true';
+                                      settingsAPI.update({ [module.key]: newVal }).then(loadData);
+                                    }}
+                                    className={`w-10 h-5 rounded-full relative transition-all ${systemSettings[module.key]?.value === 'true' ? 'bg-gold' : 'bg-gray-700'}`}
+                                  >
+                                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${systemSettings[module.key]?.value === 'true' ? 'right-1' : 'left-1'}`} />
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {settingsSubTab === 'tables' && (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-2xl font-bold font-display">Table Configuration</h3>
+                          <button
+                            onClick={() => {
+                              const num = prompt('Table Number:');
+                              const cap = prompt('Capacity:', '4');
+                              if (num) tablesAPI.create({ table_number: num, capacity: cap }).then(loadData);
+                            }}
+                            className="premium-button !py-2 !px-6 text-xs uppercase"
+                          >
+                            Add New Table
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                          {tables.map(table => (
+                            <div key={table.id} className="glass-card p-6 flex flex-col items-center group relative overflow-hidden">
+                              <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                <button onClick={() => confirm('Delete Table?') && tablesAPI.delete(table.id).then(loadData)} className="p-1.5 bg-red-500/10 text-red-500 rounded"><Trash2 size={14} /></button>
+                              </div>
+                              <div className="p-4 bg-white rounded-2xl mb-4">
+                                <QrCode size={80} className="text-black" />
+                              </div>
+                              <h4 className="text-lg font-bold">Table {table.table_number}</h4>
+                              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-black mb-4">Capacity: {table.capacity} Persons</p>
+                              <button className="text-[10px] font-black uppercase text-gold hover:underline">Download QR Code</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
+
 
 
               </motion.div>
@@ -1396,8 +2161,22 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Branch Assignment</label>
+                      <select
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                        value={formData.branch_id || ''}
+                        onChange={e => setFormData({ ...formData, branch_id: e.target.value })}
+                      >
+                        <option value="">Global / No Branch</option>
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
+
 
                 {(formType === 'food' || formType === 'menu') && (
                   <div className="space-y-2">
@@ -1562,7 +2341,7 @@ const AdminDashboard = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };
 

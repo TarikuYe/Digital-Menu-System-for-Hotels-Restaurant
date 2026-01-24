@@ -61,3 +61,51 @@ export const getTableById = async (req, res, next) => {
         next(error);
     }
 };
+// Create a new table
+export const createTable = async (req, res, next) => {
+    try {
+        const { table_number, capacity, region_name } = req.body;
+
+        const result = await pool.query(
+            'INSERT INTO restaurant_tables (table_number, capacity, region_name, status) VALUES ($1, $2, $3, \'available\') RETURNING *',
+            [table_number, capacity || 4, region_name || 'Main Hall']
+        );
+
+        res.status(201).json({ message: 'Table created', table: result.rows[0] });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Update table configuration
+export const updateTable = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { table_number, capacity, region_name } = req.body;
+
+        const result = await pool.query(
+            'UPDATE restaurant_tables SET table_number = COALESCE($1, table_number), capacity = COALESCE($2, capacity), region_name = COALESCE($3, region_name), updated_at = CURRENT_TIMESTAMP WHERE id = $4 RETURNING *',
+            [table_number, capacity, region_name, id]
+        );
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Table not found' });
+
+        res.json({ message: 'Table updated', table: result.rows[0] });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Delete a table
+export const deleteTable = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM restaurant_tables WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Table not found' });
+
+        res.json({ message: 'Table deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+};

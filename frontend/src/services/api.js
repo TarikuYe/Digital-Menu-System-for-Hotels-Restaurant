@@ -102,7 +102,19 @@ export const tablesAPI = {
   getAll: () => api.get('/tables'),
   getById: (id) => api.get(`/tables/${id}`),
   updateStatus: (id, status) => api.put(`/tables/${id}/status`, { status }),
+  create: (data) => api.post('/tables', data),
+  update: (id, data) => api.put(`/tables/${id}`, data),
+  delete: (id) => api.delete(`/tables/${id}`),
 };
+
+// Settings API
+export const settingsAPI = {
+  getAll: () => api.get('/settings'),
+  update: (settings) => api.put('/settings', { settings }),
+  getProfile: () => api.get('/settings/profile'),
+  updateProfile: (data) => api.put('/settings/profile', data),
+};
+
 
 // Kitchen API
 export const kitchenAPI = {
@@ -149,6 +161,53 @@ export const analyticsAPI = {
   getSales: () => api.get('/analytics/sales'),
   getBehavior: () => api.get('/analytics/behavior'),
 };
+
+// Communication API
+export const communicationAPI = {
+  getAnnouncements: (params) => api.get('/communications/announcements', { params }),
+  createAnnouncement: (data) => api.post('/communications/announcements', data),
+  deleteAnnouncement: (id) => api.delete(`/communications/announcements/${id}`),
+  sendStaffAlert: (data) => api.post('/communications/staff-alert', data),
+  getNotifications: () => api.get('/communications/notifications'),
+  markRead: (id) => api.patch(`/communications/notifications/${id}/read`),
+  getSettings: () => api.get('/communications/settings'),
+  updateSettings: (data) => api.put('/communications/settings', data),
+};
+
+// Audit API
+export const auditAPI = {
+  getLogs: (params) => api.get('/audit/logs', { params }),
+  getInsights: () => api.get('/audit/insights'),
+  triggerBackup: () => api.post('/audit/backup'),
+};
+
+// Branch API
+export const branchAPI = {
+  getAll: () => api.get('/branches'),
+  create: (data) => api.post('/branches', data),
+  update: (id, data) => api.put(`/branches/${id}`, data),
+  delete: (id) => api.delete(`/branches/${id}`),
+  getPerformance: () => api.get('/branches/performance'),
+};
+
+// Export API
+export const exportAPI = {
+  downloadOrders: () => api.get('/export/orders', { responseType: 'blob' }),
+  downloadFeedback: () => api.get('/export/feedback', { responseType: 'blob' }),
+  downloadSales: () => api.get('/export/sales', { responseType: 'blob' }),
+};
+
+// Integration API
+export const integrationAPI = {
+  getKeys: () => api.get('/integrations/keys'),
+  createKey: (data) => api.post('/integrations/keys', data),
+  deleteKey: (id) => api.delete(`/integrations/keys/${id}`),
+  toggleKey: (id, is_active) => api.patch(`/integrations/keys/${id}/status`, { is_active }),
+};
+
+
+
+
 
 
 

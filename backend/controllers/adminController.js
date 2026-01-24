@@ -1,17 +1,23 @@
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { USER_ROLES } from '../utils/constants.js';
+import { logAction } from './auditController.js';
+
 
 // User & Role Management
 
 // Get all users
 export const getAllUsers = async (req, res, next) => {
     try {
-        const result = await pool.query(
-            'SELECT id, email, full_name, role, phone, is_active, created_at, last_login FROM users ORDER BY created_at DESC'
-        );
+        const result = await pool.query(`
+            SELECT u.id, u.email, u.full_name, u.role, u.phone, u.is_active, u.created_at, u.last_login, u.branch_id, b.name as branch_name
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            ORDER BY u.created_at DESC
+        `);
         res.json({ users: result.rows });
     } catch (error) {
+
         next(error);
     }
 };
@@ -19,9 +25,10 @@ export const getAllUsers = async (req, res, next) => {
 // Create a new user
 export const createUser = async (req, res, next) => {
     try {
-        const { email, password, full_name, role, phone } = req.body;
+        const { email, password, full_name, role, phone, branch_id } = req.body;
 
         if (!email || !password || !full_name || !role) {
+
             return res.status(400).json({ error: 'All fields are required except phone' });
         }
 
@@ -39,14 +46,26 @@ export const createUser = async (req, res, next) => {
         const password_hash = await bcrypt.hash(password, saltRounds);
 
         const result = await pool.query(
-            'INSERT INTO users (email, password_hash, full_name, role, phone, is_active) VALUES ($1, $2, $3, $4, $5, TRUE) RETURNING id, email, full_name, role, phone, is_active, created_at',
-            [email, password_hash, full_name, role, phone || null]
+            'INSERT INTO users (email, password_hash, full_name, role, phone, branch_id, is_active) VALUES ($1, $2, $3, $4, $5, $6, TRUE) RETURNING id, email, full_name, role, phone, branch_id, is_active, created_at',
+            [email, password_hash, full_name, role, phone || null, branch_id || null]
         );
+
 
         res.status(201).json({
             message: 'User created successfully',
             user: result.rows[0],
         });
+
+        // Log the action
+        await logAction({
+            user_id: req.user.id,
+            action: 'create_user',
+            entity_type: 'user',
+            entity_id: result.rows[0].id,
+            details: { email, role },
+            req
+        });
+
     } catch (error) {
         next(error);
     }
@@ -56,7 +75,8 @@ export const createUser = async (req, res, next) => {
 export const updateUser = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { full_name, role, phone, email } = req.body;
+        const { full_name, role, phone, email, branch_id } = req.body;
+
 
         // Check if role is valid
         if (role && !Object.values(USER_ROLES).includes(role)) {
@@ -64,9 +84,10 @@ export const updateUser = async (req, res, next) => {
         }
 
         const result = await pool.query(
-            'UPDATE users SET full_name = COALESCE($1, full_name), role = COALESCE($2, role), phone = COALESCE($3, phone), email = COALESCE($4, email), updated_at = CURRENT_TIMESTAMP WHERE id = $5 RETURNING id, email, full_name, role, phone, is_active, updated_at',
-            [full_name, role, phone, email, id]
+            'UPDATE users SET full_name = COALESCE($1, full_name), role = COALESCE($2, role), phone = COALESCE($3, phone), email = COALESCE($4, email), branch_id = COALESCE($5, branch_id), updated_at = CURRENT_TIMESTAMP WHERE id = $6 RETURNING id, email, full_name, role, phone, branch_id, is_active, updated_at',
+            [full_name, role, phone, email, branch_id, id]
         );
+
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
@@ -76,6 +97,17 @@ export const updateUser = async (req, res, next) => {
             message: 'User updated successfully',
             user: result.rows[0],
         });
+
+        // Log the action
+        await logAction({
+            user_id: req.user.id,
+            action: 'update_user',
+            entity_type: 'user',
+            entity_id: id,
+            details: { full_name, role, email },
+            req
+        });
+
     } catch (error) {
         next(error);
     }
@@ -151,6 +183,17 @@ export const deleteUser = async (req, res, next) => {
         }
 
         res.json({ message: 'User deleted successfully' });
+
+        // Log the action (Critical)
+        await logAction({
+            user_id: req.user.id,
+            action: 'delete_user',
+            entity_type: 'user',
+            entity_id: id,
+            severity: 'critical',
+            req
+        });
+
     } catch (error) {
         next(error);
     }

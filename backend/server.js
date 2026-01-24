@@ -19,6 +19,17 @@ import adminRoutes from './routes/admin.js';
 import localizationRoutes from './routes/localization.js';
 import paymentRoutes from './routes/payments.js';
 import analyticsRoutes from './routes/analytics.js';
+import communicationRoutes from './routes/communications.js';
+import settingsRoutes from './routes/settings.js';
+import auditRoutes from './routes/audit.js';
+import branchRoutes from './routes/branches.js';
+import exportRoutes from './routes/export.js';
+import integrationRoutes from './routes/integrations.js';
+
+
+
+
+
 
 
 
@@ -75,6 +86,17 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/localization', localizationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/communications', communicationRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/branches', branchRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/integrations', integrationRoutes);
+
+
+
+
+
 
 
 
