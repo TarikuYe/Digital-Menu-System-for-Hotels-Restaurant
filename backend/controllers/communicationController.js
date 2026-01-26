@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import { USER_ROLES } from '../utils/constants.js';
+import { emitToRole, emitToAll } from '../utils/socket.js';
 
 // --- Announcements ---
 
@@ -37,7 +38,16 @@ export const createAnnouncement = async (req, res, next) => {
             [req.user.id, title, content, target_role || 'all', priority || 'info', expires_at || null]
         );
 
-        res.status(201).json({ message: 'Announcement created', announcement: result.rows[0] });
+        const announcement = result.rows[0];
+
+        // Emit real-time announcement
+        if (announcement.target_role === 'all') {
+            emitToAll('new_announcement', announcement);
+        } else {
+            emitToRole(announcement.target_role, 'new_announcement', announcement);
+        }
+
+        res.status(201).json({ message: 'Announcement created', announcement });
     } catch (error) {
         next(error);
     }
@@ -91,11 +101,15 @@ export const sendStaffAlert = async (req, res, next) => {
             params
         );
 
+        // Emit real-time alert to the role
+        emitToRole(recipient_role, 'staff_alert', { title, message, priority: priority || 'high' });
+
         res.json({ message: `Alert sent to ${staffIds.length} staff members` });
     } catch (error) {
         next(error);
     }
 };
+
 
 export const markNotificationRead = async (req, res, next) => {
     try {

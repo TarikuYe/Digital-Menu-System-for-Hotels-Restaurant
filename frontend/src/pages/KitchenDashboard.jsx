@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Clock,
@@ -24,6 +23,7 @@ import {
 import { kitchenAPI, foodsAPI } from '../services/api.js';
 import { ORDER_STATUS } from '../utils/constants.js';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext.jsx';
 
 const KitchenDashboard = () => {
     const [orders, setOrders] = useState([]);
@@ -37,9 +37,11 @@ const KitchenDashboard = () => {
     const [showLogModal, setShowLogModal] = useState(false);
     const [logType, setLogType] = useState('hygiene');
 
-    const loadData = async () => {
+    const { socket } = useSocket();
+
+    const loadData = useCallback(async (showLoading = true) => {
         try {
-            setLoading(true);
+            if (showLoading) setLoading(true);
             const [orderRes, statRes, foodRes] = await Promise.all([
                 kitchenAPI.getOrders(),
                 kitchenAPI.getStats(),
@@ -52,23 +54,58 @@ const KitchenDashboard = () => {
             setInventory(foodRes.data.foods);
 
         } catch (error) {
-            toast.error('Failed to update kitchen feed');
+            console.error('Error loading kitchen data:', error);
+            // Don't show toast for background updates
+            if (showLoading) toast.error('Failed to update kitchen feed');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(loadData, 15000); // Polling every 15s for "real-time"
-        return () => clearInterval(interval);
-    }, []);
+
+        if (socket) {
+            const handleNewOrder = (data) => {
+                toast.success(data.message || 'New order received!', {
+                    icon: '🍳',
+                    duration: 5000
+                });
+                loadData(false); // Background update
+            };
+
+            const handleStatusUpdate = (data) => {
+                loadData(false); // Background update
+            };
+
+            const handleAlert = (data) => {
+                toast(data.message, {
+                    icon: '🚨',
+                    style: {
+                        borderRadius: '10px',
+                        background: '#333',
+                        color: '#fff',
+                    },
+                });
+            };
+
+            socket.on('new_order', handleNewOrder);
+            socket.on('order_status_updated', handleStatusUpdate);
+            socket.on('staff_alert', handleAlert);
+
+            return () => {
+                socket.off('new_order', handleNewOrder);
+                socket.off('order_status_updated', handleStatusUpdate);
+                socket.off('staff_alert', handleAlert);
+            };
+        }
+    }, [socket, loadData]);
 
     const handleStatusUpdate = async (orderId, newStatus) => {
         try {
             await kitchenAPI.updateStatus(orderId, { status: newStatus });
             toast.success(`Order marked as ${newStatus}`);
-            loadData();
+            // real-time update will be handled by socket event
         } catch (error) {
             toast.error('Status update failed');
         }

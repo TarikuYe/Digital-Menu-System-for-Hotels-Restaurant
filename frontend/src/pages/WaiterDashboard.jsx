@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users,
@@ -33,9 +33,11 @@ import {
 import { tablesAPI, ordersAPI, foodsAPI, menusAPI, communicationAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext';
 
 const WaiterDashboard = () => {
     const { user } = useAuth();
+    const { socket } = useSocket();
     const [tables, setTables] = useState([]);
     const [orders, setOrders] = useState([]);
     const [menus, setMenus] = useState([]);
@@ -53,8 +55,9 @@ const WaiterDashboard = () => {
     const [chatMessage, setChatMessage] = useState('');
     const [stats, setStats] = useState({ ordersServed: 0, avgServiceTime: 0 });
 
-    const loadData = async () => {
+    const loadData = useCallback(async (showLoading = true) => {
         try {
+            if (showLoading) setLoading(true);
             const [tablesRes, ordersRes, menusRes, foodsRes] = await Promise.all([
                 tablesAPI.getAll(),
                 ordersAPI.getAll(),
@@ -66,23 +69,56 @@ const WaiterDashboard = () => {
             setMenus(menusRes.data.menus);
             setFoods(foodsRes.data.foods);
         } catch (error) {
-            toast.error('Failed to load data');
+            console.error('Error loading waiter data:', error);
+            if (showLoading) toast.error('Failed to load data');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(loadData, 10000); // Real-time polling
-        return () => clearInterval(interval);
-    }, []);
+
+        if (socket) {
+            const handleNewOrder = (data) => {
+                toast.success(data.message || 'New order received!', { icon: '📝' });
+                loadData(false);
+            };
+
+            const handleStatusUpdate = (data) => {
+                const { status, tableNumber } = data;
+                if (status === 'ready') {
+                    toast.success(`Order for Table ${tableNumber} is READY!`, {
+                        icon: '🔔',
+                        duration: 6000
+                    });
+                }
+                loadData(false);
+            };
+
+            const handleAlert = (data) => {
+                toast(data.message, { icon: '📢', style: { border: '1px solid #D4AF37' } });
+            };
+
+            socket.on('new_order', handleNewOrder);
+            socket.on('order_status_updated', handleStatusUpdate);
+            socket.on('staff_alert', handleAlert);
+
+            return () => {
+                socket.off('new_order', handleNewOrder);
+                socket.off('order_status_updated', handleStatusUpdate);
+                socket.off('staff_alert', handleAlert);
+            };
+        }
+    }, [socket, loadData]);
 
     const handleTableStatusChange = async (tableId, newStatus) => {
         try {
             await tablesAPI.updateStatus(tableId, newStatus);
             toast.success(`Table status updated`);
-            loadData();
+            // loadData() will be triggered by real-time event if added to backend, 
+            // but for now we call it manually just in case
+            loadData(false);
         } catch (error) {
             toast.error('Failed to update table');
         }

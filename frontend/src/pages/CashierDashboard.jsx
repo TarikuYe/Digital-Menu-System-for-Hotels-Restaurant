@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     DollarSign,
@@ -33,9 +33,11 @@ import {
 import { ordersAPI, paymentsAPI, tablesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext';
 
 const CashierDashboard = () => {
     const { user } = useAuth();
+    const { socket } = useSocket();
     const [orders, setOrders] = useState([]);
     const [payments, setPayments] = useState([]);
     const [stats, setStats] = useState({
@@ -60,8 +62,9 @@ const CashierDashboard = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [shiftOpen, setShiftOpen] = useState(true);
 
-    const loadData = async () => {
+    const loadData = useCallback(async (showLoading = true) => {
         try {
+            if (showLoading) setLoading(true);
             const [ordersRes, paymentsRes, statsRes] = await Promise.all([
                 ordersAPI.getAll({ status: 'ready,served' }),
                 paymentsAPI.getPayments(),
@@ -75,19 +78,33 @@ const CashierDashboard = () => {
 
             setOrders(unpaidOrders);
             setPayments(paymentsRes.data.payments || []);
-            setStats(statsRes.data.stats || stats);
+            setStats(prev => statsRes.data.stats || prev);
         } catch (error) {
-            toast.error('Failed to load data');
+            console.error('Error loading cashier data:', error);
+            if (showLoading) toast.error('Failed to load data');
         } finally {
-            setLoading(false);
+            if (showLoading) setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(loadData, 15000); // Real-time polling
-        return () => clearInterval(interval);
-    }, []);
+
+        if (socket) {
+            const handleUpdate = () => {
+                loadData(false);
+            };
+
+            socket.on('order_status_updated', handleUpdate);
+            socket.on('staff_alert', (data) => {
+                toast(data.message, { icon: '📢' });
+            });
+
+            return () => {
+                socket.off('order_status_updated', handleUpdate);
+            };
+        }
+    }, [socket, loadData]);
 
     const calculateTotal = () => {
         if (!selectedOrder) return 0;

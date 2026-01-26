@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
+import { SocketProvider } from './context/SocketContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import MenuPage from './pages/MenuPage.jsx';
 import OrderPage from './pages/OrderPage.jsx';
@@ -13,6 +13,7 @@ import CashierDashboard from './pages/CashierDashboard.jsx';
 import WaiterDashboard from './pages/WaiterDashboard.jsx';
 import GuestEntry from './pages/GuestEntry.jsx';
 import Navbar from './components/Common/Navbar.jsx';
+import { getRoleDashboard } from './utils/roleRedirect.js';
 
 const PrivateRoute = ({ children, requireAdmin = false, requireStaff = false, allowedRoles = [] }) => {
   const { isAuthenticated, isAdmin, user, loading } = useAuth();
@@ -30,19 +31,36 @@ const PrivateRoute = ({ children, requireAdmin = false, requireStaff = false, al
   }
 
   if (requireAdmin && !isAdmin) {
-    return <Navigate to="/menu" replace />;
+    // Redirect to user's own dashboard instead of menu
+    const userDashboard = getRoleDashboard(user);
+    return <Navigate to={userDashboard} replace />;
   }
 
   if (requireStaff && !(isAdmin || user?.role === 'staff' || user?.role === 'kitchen')) {
-    return <Navigate to="/menu" replace />;
+    const userDashboard = getRoleDashboard(user);
+    return <Navigate to={userDashboard} replace />;
   }
 
   // Check if user has one of the allowed roles
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role) && !isAdmin) {
-    return <Navigate to="/menu" replace />;
+    // Redirect to user's own dashboard
+    const userDashboard = getRoleDashboard(user);
+    return <Navigate to={userDashboard} replace />;
   }
 
   return children;
+};
+
+// Component to handle root route redirection
+const RootRedirect = () => {
+  const { isAuthenticated, user } = useAuth();
+
+  if (isAuthenticated && user) {
+    const dashboard = getRoleDashboard(user);
+    return <Navigate to={dashboard} replace />;
+  }
+
+  return <Navigate to="/menu" replace />;
 };
 
 const AppRoutes = () => {
@@ -99,7 +117,7 @@ const AppRoutes = () => {
         }
       />
       <Route path="/scan/:token" element={<GuestEntry />} />
-      <Route path="/" element={<Navigate to="/menu" replace />} />
+      <Route path="/" element={<RootRedirect />} />
     </Routes>
   );
 };
@@ -107,16 +125,19 @@ const AppRoutes = () => {
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
-          <div className="min-h-screen bg-brand-dark">
-            <Navbar />
-            <AppRoutes />
-          </div>
-        </Router>
-      </CartProvider>
+      <SocketProvider>
+        <CartProvider>
+          <Router>
+            <div className="min-h-screen bg-brand-dark">
+              <Navbar />
+              <AppRoutes />
+            </div>
+          </Router>
+        </CartProvider>
+      </SocketProvider>
     </AuthProvider>
   );
 }
 
 export default App;
+

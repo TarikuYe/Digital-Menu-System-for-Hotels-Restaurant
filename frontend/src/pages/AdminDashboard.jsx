@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Utensils,
@@ -52,17 +52,12 @@ import {
   auditAPI, branchAPI, exportAPI, integrationAPI
 } from '../services/api.js';
 
-
-
-
-
-
-
-
 import { ORDER_STATUS, SPICE_LEVELS, USER_ROLES } from '../utils/constants.js';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext.jsx';
 
 const AdminDashboard = () => {
+  const { socket } = useSocket();
   const [activeTab, setActiveTab] = useState('orders');
   const [menus, setMenus] = useState([]);
   const [foods, setFoods] = useState([]);
@@ -90,18 +85,7 @@ const AdminDashboard = () => {
   const [branchPerformance, setBranchPerformance] = useState([]);
   const [apiKeys, setApiKeys] = useState([]);
   const [loading, setLoading] = useState(false);
-
-
-
-
-
-
-
   const [payments, setPayments] = useState([]);
-
-
-
-
 
   // Modal State
   const [showForm, setShowForm] = useState(false);
@@ -149,40 +133,8 @@ const AdminDashboard = () => {
 
   const [formData, setFormData] = useState(initialFoodState);
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  const handleExport = async (apiCall, fileName) => {
-    try {
-      toast.loading('Preparing export...', { id: 'export' });
-      const response = await apiCall();
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success('Generated successfully!', { id: 'export' });
-    } catch (error) {
-      console.error(error);
-      toast.error('Export failed', { id: 'export' });
-    }
-  };
-
-
-  useEffect(() => {
-    if (activeTab === 'settings' && settingsSubTab === 'translations' && selectedLanguage) {
-      localizationAPI.getTranslations(selectedLanguage.id)
-        .then(res => setTranslations(res.data.translations))
-        .catch(err => toast.error('Failed to load translations'));
-    }
-  }, [selectedLanguage, settingsSubTab, activeTab]);
-
-
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       if (activeTab === 'menu') {
         const [foodRes, menuRes, ingRes] = await Promise.all([
@@ -227,7 +179,6 @@ const AdminDashboard = () => {
           setSelectedLanguage(def);
         }
 
-        // Fetch tables if we are in the tables management sub-tab (or just fetch them anyway)
         const tableRes = await tablesAPI.getAll();
         setTables(tableRes.data.tables);
       } else if (activeTab === 'security') {
@@ -248,9 +199,6 @@ const AdminDashboard = () => {
         const response = await integrationAPI.getKeys();
         setApiKeys(response.data.keys);
       }
-
-
-
       else if (activeTab === 'payments') {
         const [payRes, statRes] = await Promise.all([
           paymentsAPI.getPayments(),
@@ -273,17 +221,45 @@ const AdminDashboard = () => {
         setAnnouncements(announceRes.data.announcements);
         setCommSettings(settingsRes.data.settings);
       }
-
-
-
-
     } catch (error) {
       console.error('Error loading admin data:', error);
-      toast.error('Failed to load data');
+      if (showLoading) toast.error('Failed to load data');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, [activeTab, selectedLanguage]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    if (socket) {
+      const handleNewOrder = (data) => {
+        if (activeTab === 'orders') {
+          loadData(false);
+        }
+        toast.success(data.message || 'New order placed!', { icon: '💰' });
+      };
+
+      const handleUpdate = () => {
+        loadData(false);
+      };
+
+      socket.on('new_order', handleNewOrder);
+      socket.on('order_status_updated', handleUpdate);
+      socket.on('new_announcement', (data) => {
+        toast(data.title, { icon: '📣' });
+        if (activeTab === 'communications') loadData(false);
+      });
+
+      return () => {
+        socket.off('new_order', handleNewOrder);
+        socket.off('order_status_updated', handleUpdate);
+      };
+    }
+  }, [socket, activeTab, loadData]);
+
 
   const handleUpdateOrderStatus = async (orderId, status, assigned_to) => {
     try {

@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { initSocket } from './utils/socket.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import pool from './config/database.js';
 
@@ -26,16 +28,6 @@ import branchRoutes from './routes/branches.js';
 import exportRoutes from './routes/export.js';
 import integrationRoutes from './routes/integrations.js';
 
-
-
-
-
-
-
-
-
-
-
 // Load environment variables
 dotenv.config();
 
@@ -58,7 +50,11 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize Socket.io
+initSocket(server);
 
 // Middleware
 app.use(cors({
@@ -95,17 +91,6 @@ app.use('/api/branches', branchRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/integrations', integrationRoutes);
 
-
-
-
-
-
-
-
-
-
-
-
 // Error handling middleware (must be last)
 app.use(notFound);
 app.use(errorHandler);
@@ -129,7 +114,7 @@ async function startServer() {
   }
 
   // Start server
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🌐 CORS enabled for: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
@@ -141,6 +126,7 @@ async function startServer() {
 }
 
 startServer();
+
 
 
 // Triggering restart

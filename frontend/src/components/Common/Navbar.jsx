@@ -17,16 +17,14 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { to: '/menu', label: 'Menu', icon: <Utensils size={18} /> },
-    { to: '/orders', label: 'My Orders', icon: <ClipboardList size={18} />, auth: true },
-    { to: '/kitchen', label: 'Kitchen', icon: <ChefHat size={18} />, staff: true },
-    { to: '/waiter', label: 'Tables', icon: <ClipboardList size={18} />, staff: true },
-    { to: '/cashier', label: 'Cashier', icon: <DollarSign size={18} />, cashier: true },
-    { to: '/admin', label: 'Admin', icon: <LayoutDashboard size={18} />, admin: true },
+    { to: '/menu', label: 'Menu', icon: <Utensils size={18} />, roles: ['customer'], showForGuest: true },
+    { to: '/orders', label: 'My Orders', icon: <ClipboardList size={18} />, roles: ['customer'], auth: true },
+    { to: '/kitchen', label: 'Kitchen', icon: <ChefHat size={18} />, roles: ['kitchen'] },
+    { to: '/waiter', label: 'Tables', icon: <ClipboardList size={18} />, roles: ['staff'] },
+    { to: '/cashier', label: 'Cashier', icon: <DollarSign size={18} />, roles: ['cashier'] },
+    { to: '/manager', label: 'Manager', icon: <LayoutDashboard size={18} />, roles: ['manager'] },
+    { to: '/admin', label: 'Admin', icon: <LayoutDashboard size={18} />, roles: ['admin'] },
   ];
-
-  const isStaff = user?.role === 'staff' || user?.role === 'kitchen' || user?.role === 'manager' || isAdmin;
-  const isCashier = user?.role === 'cashier' || user?.role === 'manager' || isAdmin;
 
   return (
     <nav className="bg-brand-dark/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-[100]">
@@ -44,10 +42,13 @@ const Navbar = () => {
 
             <div className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => {
-                if (link.auth && !isAuthenticated) return null;
-                if (link.admin && !isAdmin) return null;
-                if (link.staff && !isStaff) return null;
-                if (link.cashier && !isCashier) return null;
+                if (!isAuthenticated) {
+                  if (!link.showForGuest) return null;
+                } else {
+                  if (link.roles && (!user || !link.roles.includes(user.role))) {
+                    return null;
+                  }
+                }
 
                 const isActive = location.pathname === link.to;
 

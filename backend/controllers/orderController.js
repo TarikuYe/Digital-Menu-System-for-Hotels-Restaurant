@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import { ORDER_STATUS, USER_ROLES } from '../utils/constants.js';
+import { emitToRole, emitToOrder } from '../utils/socket.js';
 
 // Create order (Customer/Guest)
 export const createOrder = async (req, res, next) => {
@@ -71,13 +72,25 @@ export const createOrder = async (req, res, next) => {
       [order.id, ORDER_STATUS.PENDING, !req.user.isGuest ? req.user.id : null]
     );
 
-    res.status(201).json({ message: 'Order created successfully', orderId: order.id });
+    // Emit real-time notification
+    const orderNotification = {
+      message: `New order from Table ${order.table_number}`,
+      orderId: order.id,
+      tableNumber: order.table_number,
+      total: order.total_amount
+    };
+    emitToRole(USER_ROLES.KITCHEN, 'new_order', orderNotification);
+    emitToRole(USER_ROLES.MANAGER, 'new_order', orderNotification);
+    emitToRole(USER_ROLES.ADMIN, 'new_order', orderNotification);
+    emitToRole(USER_ROLES.STAFF, 'new_order', orderNotification);
+
+    res.status(201).json({ message: 'Order created successfully', orderId: order.id, order });
   } catch (error) {
     next(error);
   }
 };
 
-// ... existing getOrders and getOrderById remains similar ...
+// Get all orders with filtering
 export const getOrders = async (req, res, next) => {
   try {
     const { status, limit = 50, offset = 0 } = req.query;
@@ -118,7 +131,7 @@ export const getOrders = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-
+// Get single order detail
 export const getOrderById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -137,10 +150,11 @@ export const updateOrderStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status, assigned_to } = req.body;
 
-    const currentOrder = await pool.query('SELECT status FROM orders WHERE id = $1', [id]);
+    const currentOrder = await pool.query('SELECT status, table_number FROM orders WHERE id = $1', [id]);
     if (currentOrder.rows.length === 0) return res.status(404).json({ error: 'Order not found' });
 
     const oldStatus = currentOrder.rows[0].status;
+    const tableNumber = currentOrder.rows[0].table_number;
 
     await pool.query('BEGIN');
 
@@ -163,22 +177,39 @@ export const updateOrderStatus = async (req, res, next) => {
     updateQuery += ' WHERE id = $1 RETURNING *';
 
     const result = await pool.query(updateQuery, params);
+    const updatedOrder = result.rows[0];
 
     if (status && status !== oldStatus) {
       await pool.query(
         'INSERT INTO order_status_logs (order_id, old_status, new_status, changed_by) VALUES ($1, $2, $3, $4)',
         [id, oldStatus, status, req.user.id]
       );
+
+      // Emit to customer tracking room
+      emitToOrder(id, 'order_status_changed', {
+        orderId: id,
+        status,
+        message: `Your order status changed to ${status}`
+      });
+
+      // Emit to specific roles for dashboard updates
+      const updateData = { orderId: id, status, tableNumber, updatedOrder };
+      emitToRole(USER_ROLES.KITCHEN, 'order_status_updated', updateData);
+      emitToRole(USER_ROLES.MANAGER, 'order_status_updated', updateData);
+      emitToRole(USER_ROLES.ADMIN, 'order_status_updated', updateData);
+      emitToRole(USER_ROLES.STAFF, 'order_status_updated', updateData);
+      emitToRole(USER_ROLES.CASHIER, 'order_status_updated', updateData);
     }
 
     await pool.query('COMMIT');
 
-    res.json({ message: 'Order updated', order: result.rows[0] });
+    res.json({ message: 'Order updated', order: updatedOrder });
   } catch (error) {
     await pool.query('ROLLBACK');
     next(error);
   }
 };
+
 
 
 export const getPrepTimeAnalytics = async (req, res, next) => {

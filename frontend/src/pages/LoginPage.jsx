@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Phone, ArrowRight, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { authAPI } from '../services/api.js';
+import { getRoleDashboard } from '../utils/roleRedirect.js';
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,8 +16,16 @@ const LoginPage = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const dashboard = getRoleDashboard(user);
+      navigate(dashboard, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -35,7 +44,9 @@ const LoginPage = () => {
           password: formData.password,
         });
         login(response.data.token, response.data.user);
-        navigate('/menu');
+        // Redirect to role-specific dashboard
+        const dashboard = getRoleDashboard(response.data.user);
+        navigate(dashboard);
       } else {
         const response = await authAPI.register({
           email: formData.email,
@@ -44,7 +55,9 @@ const LoginPage = () => {
           phone: formData.phone,
         });
         login(response.data.token, response.data.user);
-        navigate('/menu');
+        // Redirect to role-specific dashboard
+        const dashboard = getRoleDashboard(response.data.user);
+        navigate(dashboard);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'An error occurred');

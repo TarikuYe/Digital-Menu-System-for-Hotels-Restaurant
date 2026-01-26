@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, ChevronLeft, Trash2, Plus, Minus, Clock, MapPin, Receipt, CheckCircle2, Timer } from 'lucide-react';
@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { ordersAPI } from '../services/api.js';
 import { ORDER_STATUS } from '../utils/constants.js';
+import { useSocket } from '../context/SocketContext.jsx';
+import toast from 'react-hot-toast';
 
 const STATUS_DETAILS = {
   pending: { label: 'Awaiting Confirmation', color: 'text-gray-400' },
@@ -19,6 +21,7 @@ const STATUS_DETAILS = {
 
 const OrderPage = () => {
   const { isAuthenticated, user } = useAuth();
+  const { socket } = useSocket();
   const { cart, removeFromCart, updateQuantity, clearCart, getTotal } = useCart();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
@@ -27,25 +30,50 @@ const OrderPage = () => {
   const [tableNumber, setTableNumber] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadOrders();
-      // Polling for status updates (in a real app, use WebSockets)
-      const interval = setInterval(loadOrders, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [isAuthenticated]);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async (showLoading = true) => {
     try {
+      if (showLoading) setLoading(true);
       const response = await ordersAPI.getAll();
       setOrders(response.data.orders);
+
+      // Join individual order rooms for real-time updates
+      if (socket && response.data.orders) {
+        response.data.orders.forEach(order => {
+          if (order.status !== 'served' && order.status !== 'cancelled') {
+            socket.emit('join_order', order.id);
+          }
+        });
+      }
     } catch (error) {
       console.error('Error loading orders:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, [socket]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadOrders();
+    }
+  }, [isAuthenticated, loadOrders]);
+
+  useEffect(() => {
+    if (socket && isAuthenticated) {
+      const handleStatusChange = (data) => {
+        toast.success(data.message || `Order status updated to ${data.status}`, {
+          icon: '🍽️',
+          duration: 4000
+        });
+        loadOrders(false);
+      };
+
+      socket.on('order_status_changed', handleStatusChange);
+
+      return () => {
+        socket.off('order_status_changed', handleStatusChange);
+      };
+    }
+  }, [socket, isAuthenticated, loadOrders]);
 
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
