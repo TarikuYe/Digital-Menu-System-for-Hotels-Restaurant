@@ -14,6 +14,12 @@ export const getPayments = async (req, res, next) => {
         const params = [];
         let paramCount = 0;
 
+        if (req.user.role === 'manager' && req.user.branch_id) {
+            paramCount++;
+            query += ` AND (o.branch_id = $${paramCount} OR o.branch_id IS NULL)`;
+            params.push(req.user.branch_id);
+        }
+
         if (status) {
             paramCount++;
             query += ` AND p.status = $${paramCount}`;
@@ -66,8 +72,10 @@ export const getRevenueStats = async (req, res, next) => {
                 SUM(CASE WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN amount ELSE 0 END) as monthly_revenue,
                 COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_transactions,
                 COUNT(CASE WHEN payment_method = 'digital' THEN 1 END) as digital_transactions
-            FROM payments
-            WHERE status = 'completed'
+            FROM payments p
+            JOIN orders o ON p.order_id = o.id
+            WHERE p.status = 'completed'
+            ${req.user.role === 'manager' && req.user.branch_id ? `AND (o.branch_id = '${req.user.branch_id}' OR o.branch_id IS NULL)` : ''}
         `);
 
         res.json({ stats: stats.rows[0] });

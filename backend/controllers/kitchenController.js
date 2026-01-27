@@ -5,7 +5,8 @@ import { ORDER_STATUS } from '../utils/constants.js';
 export const getKitchenOrders = async (req, res, next) => {
     try {
         // Kitchen sees Pending, Confirmed, Preparing, and recently Ready orders
-        const result = await pool.query(`
+        const { branch_id } = req.user;
+        let query = `
             SELECT 
                 o.*, 
                 u.full_name as customer_name,
@@ -15,16 +16,25 @@ export const getKitchenOrders = async (req, res, next) => {
             LEFT JOIN users u ON o.user_id = u.id
             LEFT JOIN guest_sessions gs ON o.guest_session_id = gs.id
             LEFT JOIN branches b ON o.branch_id = b.id
-            WHERE o.status IN ($1, $2, $3)
-            OR (o.status = $4 AND o.updated_at > NOW() - INTERVAL '30 minutes')
-            ORDER BY 
+            WHERE (o.status IN ($1, $2, $3)
+            OR (o.status = $4 AND o.updated_at > NOW() - INTERVAL '30 minutes'))
+        `;
+        const params = [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PREPARING, ORDER_STATUS.READY];
+
+        if (branch_id) {
+            query += ` AND o.branch_id = $5`;
+            params.push(branch_id);
+        }
+
+        query += ` ORDER BY 
                 CASE 
                     WHEN o.priority = 'urgent' THEN 1
                     WHEN o.priority = 'high' THEN 2
                     ELSE 3 
                 END,
-                o.created_at ASC
-        `, [ORDER_STATUS.PENDING, ORDER_STATUS.CONFIRMED, ORDER_STATUS.PREPARING, ORDER_STATUS.READY]);
+                o.created_at ASC`;
+
+        const result = await pool.query(query, params);
 
         const orders = result.rows;
 
@@ -121,28 +131,35 @@ export const logKitchenCheck = async (req, res, next) => {
 // Get Kitchen Performance (Limited view)
 export const getKitchenStats = async (req, res, next) => {
     try {
+        const { branch_id } = req.user;
+        const branchFilter = branch_id ? 'AND branch_id = $1' : '';
+        const params = branch_id ? [branch_id] : [];
+
         const statsResult = await pool.query(`
             SELECT 
                 COUNT(*) filter (where status = 'ready' OR status = 'served') as prepared_count,
                 AVG(EXTRACT(EPOCH FROM (updated_at - created_at))/60) filter (where status = 'ready') as avg_prep_time
             FROM orders
             WHERE created_at > CURRENT_DATE
-        `);
+            ${branchFilter}
+        `, params);
 
         const peakResult = await pool.query(`
             SELECT EXTRACT(HOUR FROM created_at) as peak_hour, COUNT(*) as order_count
             FROM orders
             WHERE created_at > now() - INTERVAL '24 hours'
+            ${branchFilter}
             GROUP BY peak_hour
             ORDER BY order_count DESC
             LIMIT 1
-        `);
+        `, params);
 
         const loadResult = await pool.query(`
             SELECT COUNT(*) as active_items FROM order_items oi 
             JOIN orders o ON oi.order_id = o.id 
             WHERE o.status IN ('confirmed', 'preparing')
-        `);
+            ${branchFilter.replace('branch_id', 'o.branch_id')}
+        `, params);
 
         res.json({
             stats: statsResult.rows[0],

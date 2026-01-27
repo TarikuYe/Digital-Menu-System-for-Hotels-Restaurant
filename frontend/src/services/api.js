@@ -125,6 +125,7 @@ export const kitchenAPI = {
 export const managerAPI = {
   getStats: () => api.get('/manager/stats'),
   getActivity: () => api.get('/manager/activity'),
+  getFinancial: () => api.get('/manager/financial'),
 };
 
 // Admin API

@@ -6,7 +6,7 @@ import { USER_ROLES } from '../utils/constants.js';
 const router = express.Router();
 
 router.use(authenticate);
-router.use(authorize(USER_ROLES.ADMIN, USER_ROLES.OWNER));
+router.use(authorize(USER_ROLES.ADMIN, USER_ROLES.OWNER, USER_ROLES.MANAGER));
 
 router.get('/orders', exportOrders);
 router.get('/feedback', exportFeedback);

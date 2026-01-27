@@ -34,7 +34,7 @@ import {
     Target,
     Zap
 } from 'lucide-react';
-import { managerAPI, ordersAPI, adminAPI, feedbackAPI, paymentsAPI, tablesAPI } from '../services/api';
+import { managerAPI, ordersAPI, adminAPI, feedbackAPI, paymentsAPI, tablesAPI, exportAPI, communicationAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext';
@@ -61,6 +61,12 @@ const ManagerDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [notifications, setNotifications] = useState([]);
     const [showApprovalModal, setShowApprovalModal] = useState(null);
+    const [financial, setFinancial] = useState({
+        cash: 0,
+        card: 0,
+        digital: 0,
+        mobile: 0
+    });
     const [selectedPeriod, setSelectedPeriod] = useState('today'); // today, week, month
     const { socket } = useSocket();
     const [showChat, setShowChat] = useState(false);
@@ -89,7 +95,8 @@ const ManagerDashboard = () => {
                 ordersRes,
                 feedbackRes,
                 paymentsRes,
-                tablesRes
+                tablesRes,
+                financialRes
             ] = await Promise.all([
                 managerAPI.getStats(),
                 managerAPI.getActivity(),
@@ -97,16 +104,21 @@ const ManagerDashboard = () => {
                 ordersAPI.getAll(),
                 feedbackAPI.getAll(),
                 paymentsAPI.getPayments(),
-                tablesAPI.getAll()
+                tablesAPI.getAll(),
+                managerAPI.getFinancial()
             ]);
 
             setStats(statsRes.data);
             setActivity(activityRes.data || []);
-            setStaff(staffRes.data.users?.filter(u => u.role !== 'admin') || []);
+            setStaff(staffRes.data.users?.filter(u =>
+                // Show all staff in same branch or global staff
+                (user.role === 'admin' || !u.branch_id || u.branch_id === user.branch_id)
+            ) || []);
             setOrders(ordersRes.data.orders || []);
             setFeedback(feedbackRes.data.feedback || []);
             setPayments(paymentsRes.data.payments || []);
             setTables(tablesRes.data.tables || []);
+            setFinancial(financialRes.data);
 
             // Generate notifications
             const newNotifications = [];
@@ -197,6 +209,38 @@ const ManagerDashboard = () => {
             loadData();
         } catch (error) {
             toast.error('Failed to send response');
+        }
+    };
+
+    const handleExport = async (type) => {
+        try {
+            let response;
+            let filename = '';
+
+            if (type === 'sales') {
+                response = await exportAPI.downloadSales();
+                filename = `sales_report_${new Date().toISOString().split('T')[0]}.csv`;
+            } else if (type === 'orders') {
+                response = await exportAPI.downloadOrders();
+                filename = `orders_report_${new Date().toISOString().split('T')[0]}.csv`;
+            } else if (type === 'feedback') {
+                response = await exportAPI.downloadFeedback();
+                filename = `feedback_report_${new Date().toISOString().split('T')[0]}.csv`;
+            }
+
+            if (response) {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                toast.success('Report downloaded successfully');
+            }
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast.error('Failed to export report');
         }
     };
 
@@ -338,26 +382,37 @@ const ManagerDashboard = () => {
                     prefix="$"
                     icon={DollarSign}
                     color="#10b981"
-                    trend={12}
+                    trend={stats.revenueTrend}
                 />
                 <StatCard
                     title="Total Orders"
                     value={stats.totalOrders || 0}
                     icon={TrendingUp}
                     color="#3b82f6"
-                    trend={8}
+                    trend={stats.ordersTrend}
                 />
                 <StatCard
                     title="Active Tables"
-                    value={stats.activeTables || tables.filter(t => t.status === 'occupied').length}
+                    value={stats.activeTables || 0}
                     icon={Users}
                     color="#8b5cf6"
-                    trend={-3}
+                />
+                <StatCard
+                    title="Staff Active"
+                    value={stats.staffCount || 0}
+                    icon={UserCheck}
+                    color="#eab308"
+                />
+                <StatCard
+                    title="Avg Service"
+                    value={stats.avgServiceTime ? `${stats.avgServiceTime}m` : '0m'}
+                    icon={Clock}
+                    color="#ec4899"
                 />
                 <StatCard
                     title="Pending Orders"
-                    value={stats.pendingOrders || orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length}
-                    icon={Clock}
+                    value={stats.pendingOrders || 0}
+                    icon={Utensils}
                     color="#f59e0b"
                 />
             </div>
@@ -431,13 +486,28 @@ const ManagerDashboard = () => {
                                 Quick Actions
                             </h3>
                             <div className="space-y-3">
-                                <button className="w-full py-3 bg-gold/20 text-gold rounded-xl text-sm font-bold hover:bg-gold hover:text-black transition-all">
+                                <button
+                                    onClick={async () => {
+                                        const title = prompt('Announcement Title:');
+                                        const message = prompt('Announcement Message:');
+                                        if (title && message) {
+                                            try {
+                                                await communicationAPI.createAnnouncement({ title, message, target_role: 'all' });
+                                                toast.success('Announcement broadcasted');
+                                            } catch (e) { toast.error('Failed to broadcast'); }
+                                        }
+                                    }}
+                                    className="w-full py-3 bg-gold/20 text-gold rounded-xl text-sm font-bold hover:bg-gold hover:text-black transition-all"
+                                >
                                     Announce to All Staff
                                 </button>
                                 <button className="w-full py-3 bg-blue-500/20 text-blue-500 rounded-xl text-sm font-bold hover:bg-blue-500 hover:text-white transition-all">
                                     View Staff Schedule
                                 </button>
-                                <button className="w-full py-3 bg-green-500/20 text-green-500 rounded-xl text-sm font-bold hover:bg-green-500 hover:text-white transition-all">
+                                <button
+                                    onClick={() => handleExport('sales')}
+                                    className="w-full py-3 bg-green-500/20 text-green-500 rounded-xl text-sm font-bold hover:bg-green-500 hover:text-white transition-all"
+                                >
                                     Export Daily Report
                                 </button>
                             </div>
@@ -446,11 +516,15 @@ const ManagerDashboard = () => {
                         <div className="glass-card p-6 border-l-4 border-purple-500 bg-purple-500/5">
                             <h3 className="text-lg font-bold mb-2">Performance Insight</h3>
                             <p className="text-sm text-gray-400 mb-4">
-                                Service time improved by 15% this week. Great job team!
+                                {stats.serviceImprovement > 0
+                                    ? `Service time improved by ${stats.serviceImprovement}% compared to yesterday. Great job team!`
+                                    : stats.serviceImprovement < 0
+                                        ? `Service time is ${Math.abs(stats.serviceImprovement)}% slower than yesterday. Let's pick up the pace.`
+                                        : "Service time is holding steady. Stay focused on quality service."}
                             </p>
-                            <div className="flex items-center gap-2 text-green-500 text-sm font-bold">
+                            <div className={`flex items-center gap-2 text-sm font-bold ${stats.serviceImprovement >= 0 ? 'text-green-500' : 'text-yellow-500'}`}>
                                 <Award size={16} />
-                                On Track for Monthly Target
+                                {stats.serviceImprovement > 0 ? 'On Track for Monthly Target' : 'Keep Pushing for Excellence'}
                             </div>
                         </div>
                     </div>
@@ -470,7 +544,11 @@ const ManagerDashboard = () => {
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <h3 className="font-bold text-lg">{member.full_name}</h3>
-                                        <p className="text-xs text-gray-500 uppercase tracking-widest">{member.role}</p>
+                                        <p className="text-xs text-gray-500 uppercase tracking-widest">
+                                            {member.role === 'staff' ? 'Waiter' :
+                                                member.role === 'kitchen' ? 'Kitchen Staff' :
+                                                    member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                                        </p>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${member.is_active ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
                                         }`}>
@@ -509,7 +587,7 @@ const ManagerDashboard = () => {
                         Order Exception Handling
                     </h2>
                     <div className="space-y-4">
-                        {orders.filter(o => o.status !== 'served' && o.status !== 'cancelled').map(order => (
+                        {orders.filter(o => o.status !== 'cancelled').map(order => (
                             <div key={order.id} className="p-6 bg-white/5 rounded-xl border border-white/5">
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
@@ -551,15 +629,15 @@ const ManagerDashboard = () => {
                         <div className="space-y-4">
                             <div className="p-6 bg-green-500/10 border border-green-500/20 rounded-xl">
                                 <p className="text-sm text-gray-400 mb-2">Cash Payments</p>
-                                <p className="text-3xl font-black text-green-500">$2,450.00</p>
+                                <p className="text-3xl font-black text-green-500">${financial.cash.toFixed(2)}</p>
                             </div>
                             <div className="p-6 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                                 <p className="text-sm text-gray-400 mb-2">Card Payments</p>
-                                <p className="text-3xl font-black text-blue-500">$3,890.00</p>
+                                <p className="text-3xl font-black text-blue-500">${financial.card.toFixed(2)}</p>
                             </div>
                             <div className="p-6 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                                <p className="text-sm text-gray-400 mb-2">Mobile Payments</p>
-                                <p className="text-3xl font-black text-purple-500">$1,230.00</p>
+                                <p className="text-sm text-gray-400 mb-2">Mobile/Digital</p>
+                                <p className="text-3xl font-black text-purple-500">${(financial.mobile + financial.digital).toFixed(2)}</p>
                             </div>
                         </div>
                     </div>
@@ -645,43 +723,55 @@ const ManagerDashboard = () => {
                         Performance Reports
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <button className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left">
+                        <button
+                            onClick={() => handleExport('sales')}
+                            className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left"
+                        >
                             <FileText size={32} className="text-gold mb-4" />
                             <h3 className="font-bold text-lg mb-2">Daily Sales Report</h3>
                             <p className="text-sm text-gray-400 mb-4">Comprehensive sales breakdown</p>
                             <div className="flex items-center gap-2 text-gold text-sm font-bold">
                                 <Download size={16} />
-                                Download PDF
+                                Download CSV
                             </div>
                         </button>
 
-                        <button className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left">
+                        <button
+                            onClick={() => handleExport('orders')}
+                            className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left"
+                        >
                             <Users size={32} className="text-blue-500 mb-4" />
-                            <h3 className="font-bold text-lg mb-2">Staff Performance</h3>
-                            <p className="text-sm text-gray-400 mb-4">Individual staff metrics</p>
+                            <h3 className="font-bold text-lg mb-2">Order Performance</h3>
+                            <p className="text-sm text-gray-400 mb-4">Detailed order metrics and timing</p>
                             <div className="flex items-center gap-2 text-blue-500 text-sm font-bold">
                                 <Download size={16} />
-                                Download Excel
+                                Download CSV
                             </div>
                         </button>
 
-                        <button className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left">
+                        <button
+                            onClick={() => handleExport('sales')}
+                            className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left"
+                        >
                             <TrendingUp size={32} className="text-green-500 mb-4" />
                             <h3 className="font-bold text-lg mb-2">Revenue Trends</h3>
                             <p className="text-sm text-gray-400 mb-4">Weekly and monthly analysis</p>
                             <div className="flex items-center gap-2 text-green-500 text-sm font-bold">
                                 <Download size={16} />
-                                Download PDF
+                                Download CSV
                             </div>
                         </button>
 
-                        <button className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left">
+                        <button
+                            onClick={() => handleExport('feedback')}
+                            className="p-8 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-all text-left"
+                        >
                             <Star size={32} className="text-purple-500 mb-4" />
                             <h3 className="font-bold text-lg mb-2">Customer Satisfaction</h3>
                             <p className="text-sm text-gray-400 mb-4">Feedback and ratings summary</p>
                             <div className="flex items-center gap-2 text-purple-500 text-sm font-bold">
                                 <Download size={16} />
-                                Download PDF
+                                Download CSV
                             </div>
                         </button>
                     </div>

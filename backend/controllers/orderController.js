@@ -33,17 +33,25 @@ export const createOrder = async (req, res, next) => {
       orderItems.push({ food_id, quantity, unit_price: food.price, subtotal, special_instructions: itemInstructions || null });
     }
 
-    // Determine Table ID if table_number provided
+    // Determine Table ID and Branch ID
     let tableId = null;
+    let branchId = null;
+
     if (table_number) {
-      const tableResult = await pool.query('SELECT id FROM restaurant_tables WHERE table_number = $1', [table_number]);
-      if (tableResult.rows.length > 0) tableId = tableResult.rows[0].id;
+      const tableResult = await pool.query('SELECT id, branch_id FROM restaurant_tables WHERE table_number = $1', [table_number]);
+      if (tableResult.rows.length > 0) {
+        tableId = tableResult.rows[0].id;
+        branchId = tableResult.rows[0].branch_id;
+      }
+    } else if (req.user.table_id) {
+      const tableResult = await pool.query('SELECT branch_id FROM restaurant_tables WHERE id = $1', [req.user.table_id]);
+      if (tableResult.rows.length > 0) branchId = tableResult.rows[0].branch_id;
     }
 
     // Create order
     const orderResult = await pool.query(
-      `INSERT INTO orders (user_id, guest_session_id, table_id, table_number, status, total_amount, special_instructions)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO orders (user_id, guest_session_id, table_id, table_number, status, total_amount, special_instructions, branch_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         !req.user.isGuest ? req.user.id : null,
@@ -53,6 +61,7 @@ export const createOrder = async (req, res, next) => {
         ORDER_STATUS.PENDING,
         totalAmount,
         special_instructions || null,
+        branchId || req.user.branch_id || null
       ]
     );
 
@@ -105,12 +114,16 @@ export const getOrders = async (req, res, next) => {
     const params = [];
     if (req.user.role === USER_ROLES.CUSTOMER) {
       if (req.user.isGuest) {
-        query += ` AND o.guest_session_id = $1`;
+        query += ` AND o.guest_session_id = $${params.length + 1}`;
         params.push(req.user.id);
       } else {
-        query += ` AND o.user_id = $1`;
+        query += ` AND o.user_id = $${params.length + 1}`;
         params.push(req.user.id);
       }
+    } else if ([USER_ROLES.MANAGER, USER_ROLES.STAFF, USER_ROLES.KITCHEN].includes(req.user.role) && req.user.branch_id) {
+      // Staff/Managers/Kitchen only see their branch orders (and unassigned orders for safety)
+      query += ` AND (o.branch_id = $${params.length + 1} OR o.branch_id IS NULL)`;
+      params.push(req.user.branch_id);
     }
 
     if (status) {

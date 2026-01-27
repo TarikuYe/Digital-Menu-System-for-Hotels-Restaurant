@@ -4,7 +4,10 @@ import pool from '../config/database.js';
 // Get all tables with current status and active session info
 export const getTables = async (req, res, next) => {
     try {
-        const result = await pool.query(`
+        const { branch_id, role } = req.user;
+        const isSpecialRole = ['admin', 'owner'].includes(role);
+
+        let query = `
       SELECT 
         rt.*,
         gs.id as active_session_id,
@@ -12,8 +15,17 @@ export const getTables = async (req, res, next) => {
         (SELECT COUNT(*) FROM orders o WHERE o.table_id = rt.id AND o.status NOT IN ('served', 'cancelled', 'paid')) as active_orders_count
       FROM restaurant_tables rt
       LEFT JOIN guest_sessions gs ON rt.id = gs.table_id AND gs.expires_at > CURRENT_TIMESTAMP
-      ORDER BY rt.table_number
-    `);
+      WHERE 1=1
+    `;
+        const params = [];
+
+        if (!isSpecialRole && branch_id) {
+            query += ` AND (rt.branch_id = $1 OR rt.branch_id IS NULL)`;
+            params.push(branch_id);
+        }
+
+        query += ` ORDER BY rt.table_number`;
+        const result = await pool.query(query, params);
 
         res.json({ tables: result.rows });
     } catch (error) {

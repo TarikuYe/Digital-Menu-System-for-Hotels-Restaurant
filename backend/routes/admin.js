@@ -17,7 +17,8 @@ router.get('/test', (req, res) => res.json({ message: 'Admin route working' }));
 // All admin routes require authentication and admin role
 router.use(authenticate);
 
-router.use(authorize(USER_ROLES.ADMIN));
+// Authorization for Admin and Manager (Manager has limited access logic in controller)
+router.use(authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER));
 
 router.get('/users', getAllUsers);
 router.post('/users', createUser);

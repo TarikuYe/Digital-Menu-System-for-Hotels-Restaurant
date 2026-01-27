@@ -9,12 +9,23 @@ import { logAction } from './auditController.js';
 // Get all users
 export const getAllUsers = async (req, res, next) => {
     try {
-        const result = await pool.query(`
+        const { branch_id, role } = req.user;
+        let query = `
             SELECT u.id, u.email, u.full_name, u.role, u.phone, u.is_active, u.created_at, u.last_login, u.branch_id, b.name as branch_name
             FROM users u
             LEFT JOIN branches b ON u.branch_id = b.id
-            ORDER BY u.created_at DESC
-        `);
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (role === USER_ROLES.MANAGER) {
+            query += ` AND (u.branch_id = $1 OR u.branch_id IS NULL)`;
+            params.push(branch_id);
+        }
+
+        query += ` ORDER BY u.created_at DESC`;
+
+        const result = await pool.query(query, params);
         res.json({ users: result.rows });
     } catch (error) {
 
