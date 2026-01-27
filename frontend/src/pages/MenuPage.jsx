@@ -21,6 +21,7 @@ const MenuPage = () => {
     is_vegan: false,
     is_gluten_free: false,
   });
+  const [calling, setCalling] = useState(false);
 
   useEffect(() => {
     loadMenus();
@@ -76,17 +77,28 @@ const MenuPage = () => {
   );
 
   const handleCallWaiter = async () => {
+    let tableNum = user?.table_number;
+
+    if (!tableNum) {
+      tableNum = prompt("Please enter your table number:");
+      if (!tableNum) return; // User cancelled
+    }
+
     try {
+      setCalling(true);
       await communicationAPI.sendStaffAlert({
-        recipient_role: 'staff',
+        recipient_role: 'staff', // This targets the Waiter role (mapped to 'staff' in DB)
         title: 'Table Service Request',
-        message: `Guest at Table ${user?.table_number || 'N/A'} needs assistance.`,
+        message: `Guest at Table ${tableNum} needs assistance.`,
         priority: 'high',
-        table_number: user?.table_number
+        table_number: tableNum
       });
       toast.success('Your request has been sent to the staff!', { icon: '👋' });
     } catch (e) {
+      console.error(e);
       toast.error('Failed to call waiter. Please try again.');
+    } finally {
+      setCalling(false);
     }
   };
 
@@ -276,11 +288,12 @@ const MenuPage = () => {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={handleCallWaiter}
-        className="fixed bottom-8 right-8 z-[100] w-16 h-16 rounded-full bg-gold text-black shadow-[0_10px_40px_rgba(212,175,55,0.4)] border-4 border-brand-dark flex items-center justify-center group"
+        disabled={calling}
+        className={`fixed bottom-8 right-8 z-[100] w-16 h-16 rounded-full bg-gold text-black shadow-[0_10px_40px_rgba(212,175,55,0.4)] border-4 border-brand-dark flex items-center justify-center group ${calling ? 'opacity-70 cursor-not-allowed' : ''}`}
       >
-        <Bell size={24} className="group-hover:animate-ring" />
+        <Bell size={24} className={`group-hover:animate-ring ${calling ? 'animate-pulse' : ''}`} />
         <span className="absolute right-full mr-4 px-4 py-2 bg-brand-dark/90 backdrop-blur-md border border-gold/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-          Call Waiter
+          {calling ? 'Calling...' : 'Call Waiter'}
         </span>
       </motion.button>
     </div>

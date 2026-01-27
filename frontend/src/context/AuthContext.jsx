@@ -90,6 +90,7 @@ export const AuthProvider = ({ children }) => {
     isAdmin: user?.role === 'admin',
     isStaff: user?.role === 'staff' || user?.role === 'admin',
     isCustomer: user?.role === 'customer',
+    updateUser: (data) => setUser(prev => ({ ...prev, ...data })),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

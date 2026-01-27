@@ -30,14 +30,14 @@ import {
     Star,
     MapPin
 } from 'lucide-react';
-import { tablesAPI, ordersAPI, foodsAPI, menusAPI, communicationAPI } from '../services/api';
+import { tablesAPI, ordersAPI, foodsAPI, menusAPI, communicationAPI, authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext';
 import ChatSidebar from '../components/Waiter/ChatSidebar';
 
 const WaiterDashboard = () => {
-    const { user } = useAuth();
+    const { user, updateUser } = useAuth();
     const { socket } = useSocket();
     const [tables, setTables] = useState([]);
     const [orders, setOrders] = useState([]);
@@ -55,6 +55,8 @@ const WaiterDashboard = () => {
     const [showChat, setShowChat] = useState(false);
     const [chatMessage, setChatMessage] = useState('');
     const [stats, setStats] = useState({ ordersServed: 0, avgServiceTime: 0 });
+    const [staffList, setStaffList] = useState([]);
+    const [statusLoading, setStatusLoading] = useState(false);
 
     const playNotificationSound = useCallback((priority = 'info') => {
         try {
@@ -72,16 +74,18 @@ const WaiterDashboard = () => {
     const loadData = useCallback(async (showLoading = true) => {
         try {
             if (showLoading) setLoading(true);
-            const [tablesRes, ordersRes, menusRes, foodsRes] = await Promise.all([
+            const [tablesRes, ordersRes, menusRes, foodsRes, staffRes] = await Promise.all([
                 tablesAPI.getAll(),
                 ordersAPI.getAll(),
                 menusAPI.getAll(),
-                foodsAPI.getAll()
+                foodsAPI.getAll(),
+                communicationAPI.getStaff()
             ]);
             setTables(tablesRes.data.tables);
             setOrders(ordersRes.data.orders);
             setMenus(menusRes.data.menus);
             setFoods(foodsRes.data.foods);
+            setStaffList(staffRes.data.staff);
         } catch (error) {
             console.error('Error loading waiter data:', error);
             if (showLoading) toast.error('Failed to load data');
@@ -131,12 +135,16 @@ const WaiterDashboard = () => {
             socket.on('order_status_updated', handleStatusUpdate);
             socket.on('staff_alert', handleAlert);
             socket.on('new_chat_message', handleNewChat);
+            socket.on('user_status_updated', (data) => {
+                setStaffList(prev => prev.map(s => s.id === data.id ? { ...s, status: data.status } : s));
+            });
 
             return () => {
                 socket.off('new_order', handleNewOrder);
                 socket.off('order_status_updated', handleStatusUpdate);
                 socket.off('staff_alert', handleAlert);
                 socket.off('new_chat_message', handleNewChat);
+                socket.off('user_status_updated');
             };
         }
     }, [socket, loadData]);
@@ -226,6 +234,20 @@ const WaiterDashboard = () => {
         }
     };
 
+    const handleStatusToggle = async (newStatus) => {
+        try {
+            setStatusLoading(true);
+            const response = await authAPI.updateStatus(newStatus);
+            updateUser({ status: response.data.user.status });
+            toast.success(`Status updated to ${newStatus}`);
+            loadData(false);
+        } catch (error) {
+            toast.error('Failed to update status');
+        } finally {
+            setStatusLoading(false);
+        }
+    };
+
     const getTableStatusColor = (status) => {
         switch (status) {
             case 'available': return 'border-green-500 bg-green-500/10';
@@ -272,9 +294,26 @@ const WaiterDashboard = () => {
                         <Utensils className="text-gold" size={40} />
                         Service <span className="text-gold">Command</span> Center
                     </h1>
-                    <p className="text-gray-500 font-medium uppercase tracking-[0.3em] text-[10px] mt-2">
-                        {user?.full_name} • Shift Active
-                    </p>
+                    <div className="flex items-center gap-4 mt-2">
+                        <p className="text-gray-500 font-medium uppercase tracking-[0.3em] text-[10px]">
+                            {user?.full_name}
+                        </p>
+                        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/5">
+                            {['online', 'busy', 'offline'].map((s) => (
+                                <button
+                                    key={s}
+                                    onClick={() => handleStatusToggle(s)}
+                                    disabled={statusLoading}
+                                    className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${user?.status === s
+                                        ? s === 'online' ? 'bg-green-500 text-white' : s === 'busy' ? 'bg-gold text-black' : 'bg-gray-600 text-white'
+                                        : 'text-gray-500 hover:text-white'
+                                        }`}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap gap-4">
@@ -299,21 +338,35 @@ const WaiterDashboard = () => {
                 </div>
             </header>
 
-            {/* Navigation Tabs */}
-            <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl w-fit border border-white/5 mb-8">
-                {[
-                    { id: 'tables', label: 'Tables', icon: <MapPin size={16} /> },
-                    { id: 'orders', label: 'Active Orders', icon: <Receipt size={16} /> }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveView(tab.id)}
-                        className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
-              ${activeView === tab.id ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
+            {/* Navigation and Team Status */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+                <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl w-fit border border-white/5">
+                    {[
+                        { id: 'tables', label: 'Tables', icon: <MapPin size={16} /> },
+                        { id: 'orders', label: 'Active Orders', icon: <Receipt size={16} /> }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveView(tab.id)}
+                            className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
+                ${activeView === tab.id ? 'bg-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-4 overflow-x-auto pb-2 max-w-full">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-600 whitespace-nowrap">Team Status:</span>
+                    {staffList.filter(s => s.id !== user?.id).map(staff => (
+                        <div key={staff.id} className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl border border-white/5 min-w-fit">
+                            <div className={`w-2 h-2 rounded-full ${staff.status === 'online' ? 'bg-green-500' : staff.status === 'busy' ? 'bg-gold' : 'bg-gray-600'
+                                }`} />
+                            <span className="text-[10px] font-bold text-gray-300">{staff.full_name.split(' ')[0]}</span>
+                        </div>
+                    ))}
+                    {staffList.length <= 1 && <span className="text-[10px] italic text-gray-600">No other staff online</span>}
+                </div>
             </div>
 
             {/* Tables View */}

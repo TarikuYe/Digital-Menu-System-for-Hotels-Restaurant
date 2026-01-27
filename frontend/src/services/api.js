@@ -44,6 +44,7 @@ export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
+  updateStatus: (status) => api.patch('/auth/status', { status }),
 };
 
 // Foods API
@@ -168,6 +169,7 @@ export const communicationAPI = {
   createAnnouncement: (data) => api.post('/communications/announcements', data),
   deleteAnnouncement: (id) => api.delete(`/communications/announcements/${id}`),
   sendStaffAlert: (data) => api.post('/communications/staff-alert', data),
+  getStaff: () => api.get('/communications/staff'),
   getNotifications: () => api.get('/communications/notifications'),
   markRead: (id) => api.patch(`/communications/notifications/${id}/read`),
   getMessages: () => api.get('/communications/messages'),

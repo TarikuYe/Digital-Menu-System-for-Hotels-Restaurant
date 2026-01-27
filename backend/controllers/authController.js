@@ -79,7 +79,7 @@ export const login = async (req, res, next) => {
 
     // Find user
     const result = await pool.query(
-      'SELECT id, email, password_hash, full_name, role, phone, is_active FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, full_name, role, phone, is_active, status FROM users WHERE email = $1',
       [email]
     );
 
@@ -128,7 +128,7 @@ export const login = async (req, res, next) => {
 export const getMe = async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT id, email, full_name, role, phone, created_at FROM users WHERE id = $1',
+      'SELECT id, email, full_name, role, phone, created_at, status FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -165,6 +165,29 @@ export const createGuestSession = async (req, res, next) => {
       session: result.rows[0],
       table_number
     });
+  } catch (error) {
+    next(error);
+  }
+};
+// Update User Status
+export const updateStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!status) return res.status(400).json({ error: 'Status is required' });
+
+    const result = await pool.query(
+      'UPDATE users SET status = $1 WHERE id = $2 RETURNING id, full_name, role, status',
+      [status, req.user.id]
+    );
+
+    const updatedUser = result.rows[0];
+
+    // Broadcast status change to everyone (or specific roles)
+    import('../utils/socket.js').then(({ emitToAll }) => {
+      emitToAll('user_status_updated', updatedUser);
+    });
+
+    res.json({ message: 'Status updated', user: updatedUser });
   } catch (error) {
     next(error);
   }

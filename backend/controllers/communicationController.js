@@ -82,11 +82,20 @@ export const sendStaffAlert = async (req, res, next) => {
         const { recipient_role, title, message, priority, table_number } = req.body;
 
         // Get all users with that role
-        const staffRes = await pool.query('SELECT id FROM users WHERE role = $1', [recipient_role]);
+        // Also include 'waiter' role just in case, or broaden if it's a general alert
+        const staffRes = await pool.query(
+            "SELECT id FROM users WHERE role = $1 OR (role = 'waiter' AND $1 = 'staff')",
+            [recipient_role]
+        );
         const staffIds = staffRes.rows.map(s => s.id);
 
+        console.log(`🔔 Sending staff alert to ${staffIds.length} users with role: ${recipient_role}`);
+
         if (staffIds.length === 0) {
-            return res.status(404).json({ error: 'No staff found with this role' });
+            // If no targeted staff, maybe notify managers?
+            console.log(`⚠️ No ${recipient_role} found. Falling back to managers.`);
+            const managerRes = await pool.query("SELECT id FROM users WHERE role = 'manager' OR role = 'admin'");
+            staffIds.push(...managerRes.rows.map(m => m.id));
         }
 
         // Create individual notifications
@@ -118,6 +127,26 @@ export const sendStaffAlert = async (req, res, next) => {
             table_number: table_number || null,
             created_at: new Date()
         });
+
+        // Also emit to 'admin' and 'manager' for oversight if it's high priority
+        if (priority === 'high' && recipient_role !== 'admin') {
+            emitToRole('manager', 'staff_alert', {
+                title: `[Manager Alert] ${title}`,
+                message,
+                priority,
+                sender: req.user.full_name,
+                table_number: table_number || null,
+                created_at: new Date()
+            });
+            emitToRole('admin', 'staff_alert', {
+                title: `[Admin Alert] ${title}`,
+                message,
+                priority,
+                sender: req.user.full_name,
+                table_number: table_number || null,
+                created_at: new Date()
+            });
+        }
 
         res.json({ message: `Alert sent to ${staffIds.length} staff members` });
     } catch (error) {
@@ -255,6 +284,17 @@ export const updateCommSettings = async (req, res, next) => {
         }
 
         res.json({ message: 'Settings updated' });
+    } catch (error) {
+        next(error);
+    }
+};
+// Get list of staff members with status
+export const getStaffList = async (req, res, next) => {
+    try {
+        const result = await pool.query(
+            "SELECT id, full_name, role, status, email FROM users WHERE role IN ('staff', 'waiter', 'manager') ORDER BY status DESC, full_name ASC"
+        );
+        res.json({ staff: result.rows });
     } catch (error) {
         next(error);
     }

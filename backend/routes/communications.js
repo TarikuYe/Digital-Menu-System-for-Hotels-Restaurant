@@ -9,7 +9,8 @@ import {
     getCommSettings,
     updateCommSettings,
     getMessages,
-    sendMessage
+    sendMessage,
+    getStaffList
 } from '../controllers/communicationController.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { USER_ROLES } from '../utils/constants.js';
@@ -27,6 +28,7 @@ router.patch('/notifications/:id/read', markNotificationRead);
 router.get('/messages', getMessages);
 router.post('/messages', sendMessage);
 router.post('/staff-alert', sendStaffAlert);
+router.get('/staff', getStaffList);
 
 // Admin / Manager only routes (Configuration and official announcements)
 router.post('/announcements', authorize(USER_ROLES.ADMIN, USER_ROLES.MANAGER), createAnnouncement);

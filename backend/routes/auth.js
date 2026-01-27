@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, getMe, createGuestSession } from '../controllers/authController.js';
+import { register, login, getMe, createGuestSession, updateStatus } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,6 +8,7 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/guest', createGuestSession);
 router.get('/me', authenticate, getMe);
+router.patch('/status', authenticate, updateStatus);
 
 export default router;
 
