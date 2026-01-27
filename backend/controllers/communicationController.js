@@ -129,14 +129,32 @@ export const sendStaffAlert = async (req, res, next) => {
 
 export const getMessages = async (req, res, next) => {
     try {
-        const result = await pool.query(
-            `SELECT m.*, u.full_name as sender_name, u.role as sender_role 
-             FROM messages m 
-             LEFT JOIN users u ON m.sender_id = u.id 
-             WHERE m.recipient_role = $1 OR m.recipient_role = 'all' OR (m.sender_id IS NOT NULL AND m.sender_id = $2)
-             ORDER BY m.created_at DESC LIMIT 100`,
-            [req.user.role, req.user.isGuest ? null : req.user.id]
-        );
+        const { role, branch_id, id: userId } = req.user;
+
+        // Basic query
+        let query = `
+            SELECT m.*, u.full_name as sender_name, u.role as sender_role 
+            FROM messages m 
+            LEFT JOIN users u ON m.sender_id = u.id 
+            WHERE (
+                m.recipient_role = $1 
+                OR m.recipient_role = 'all' 
+                OR m.recipient_id = $2
+                OR (m.sender_id IS NOT NULL AND m.sender_id = $2)
+            )
+        `;
+        const params = [role, userId];
+
+        // Group by branch if user is not a global admin
+        // (Assuming admins might want to see global history, but staff are restricted)
+        if (role !== USER_ROLES.ADMIN && branch_id) {
+            query += ` AND (u.branch_id = $3 OR u.branch_id IS NULL)`; // IS NULL for system/global messages
+            params.push(branch_id);
+        }
+
+        query += ` ORDER BY m.created_at DESC LIMIT 100`;
+
+        const result = await pool.query(query, params);
 
         // Post-process to handle guest messages that have no sender_name from the join
         const messages = result.rows.map(msg => {
@@ -158,13 +176,13 @@ export const getMessages = async (req, res, next) => {
 
 export const sendMessage = async (req, res, next) => {
     try {
-        const { recipient_role, message, priority, table_number } = req.body;
+        const { recipient_role, recipient_id, message, priority, table_number } = req.body;
 
         const result = await pool.query(
-            `INSERT INTO messages (sender_id, recipient_role, message, priority, table_number)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO messages (sender_id, recipient_role, recipient_id, message, priority, table_number)
+             VALUES ($1, $2, $3, $4, $5, $6)
              RETURNING *`,
-            [req.user.isGuest ? null : req.user.id, recipient_role, message, priority || 'info', table_number || null]
+            [req.user.isGuest ? null : req.user.id, recipient_role, recipient_id || null, message, priority || 'info', table_number || null]
         );
 
         const savedMessage = result.rows[0];
@@ -173,14 +191,14 @@ export const sendMessage = async (req, res, next) => {
         savedMessage.sender_name = req.user.full_name;
         savedMessage.sender_role = req.user.role;
 
-        // Emit to target role
-        if (recipient_role === 'all') {
+        // Emit to targeted audience
+        if (recipient_id) {
+            emitToUser(recipient_id, 'new_chat_message', savedMessage);
+            // Also notify sender if they want to see it pop up? (Usually handled by UI add)
+        } else if (recipient_role === 'all') {
             emitToAll('new_chat_message', savedMessage);
         } else {
             emitToRole(recipient_role, 'new_chat_message', savedMessage);
-            // Also emit to sender (if they are not in the target role room)
-            // But since staff join their own role room, we might need to handle this.
-            // For now, emitToRole should cover it if sender has same role.
         }
 
         res.status(201).json({ message: 'Message sent', chatMessage: savedMessage });

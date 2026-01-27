@@ -159,6 +159,7 @@ const ManagerDashboard = () => {
             };
 
             const handleNewChat = (data) => {
+                if (data.sender_id === user?.id) return;
                 if (!showChat) {
                     setChatNotifications(prev => [...prev, data]);
                     toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });

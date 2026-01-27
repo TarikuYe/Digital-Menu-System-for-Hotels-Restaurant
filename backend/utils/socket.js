@@ -33,6 +33,14 @@ export const initSocket = (server) => {
             }
         });
 
+        // Join user-specific room
+        socket.on('join_user', (userId) => {
+            if (userId) {
+                socket.join(`user_${userId}`);
+                console.log(`👤 Client ${socket.id} joined personal room: user_${userId}`);
+            }
+        });
+
         socket.on('disconnect', () => {
             console.log(`🔌 Client disconnected: ${socket.id}`);
         });
@@ -66,5 +74,12 @@ export const emitToOrder = (orderId, event, data) => {
 export const emitToAll = (event, data) => {
     if (io) {
         io.emit(event, data);
+    }
+};
+
+// Helper: Emit to specific user
+export const emitToUser = (userId, event, data) => {
+    if (io) {
+        io.to(`user_${userId}`).emit(event, data);
     }
 };

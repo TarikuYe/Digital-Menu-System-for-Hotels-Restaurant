@@ -29,9 +29,10 @@ export const SocketProvider = ({ children }) => {
         newSocket.on('connect', () => {
             console.log('📡 Connected to server via socket');
 
-            // Join user role room
-            if (isAuthenticated && user?.role) {
-                newSocket.emit('join', user.role);
+            // Join user-specific rooms
+            if (isAuthenticated && user) {
+                if (user.role) newSocket.emit('join', user.role);
+                if (user.id) newSocket.emit('join_user', user.id);
             }
         });
 
@@ -44,8 +45,9 @@ export const SocketProvider = ({ children }) => {
 
     // Role-based room joining when auth state changes
     useEffect(() => {
-        if (socket && isAuthenticated && user?.role) {
-            socket.emit('join', user.role);
+        if (socket && isAuthenticated && user) {
+            if (user.role) socket.emit('join', user.role);
+            if (user.id) socket.emit('join_user', user.id);
         }
     }, [socket, isAuthenticated, user]);
 

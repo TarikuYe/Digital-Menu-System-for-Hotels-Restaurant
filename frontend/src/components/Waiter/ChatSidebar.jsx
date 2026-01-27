@@ -21,7 +21,13 @@ const ChatSidebar = ({ user, onClose }) => {
     const { socket } = useSocket();
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
-    const [targetRole, setTargetRole] = useState(user?.role === 'kitchen' ? 'staff' : 'kitchen');
+    // Set sensible default: Kitchen targets Waiters, everyone else targets Kitchen
+    const getDefaultTarget = () => {
+        if (user?.role === 'kitchen') return 'staff';
+        return 'kitchen';
+    };
+
+    const [targetRole, setTargetRole] = useState(getDefaultTarget());
     const [priority, setPriority] = useState('info');
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef(null);
@@ -130,6 +136,23 @@ const ChatSidebar = ({ user, onClose }) => {
         return 'border-white/5 bg-white/5';
     };
 
+    const filteredMessages = messages.filter(msg => {
+        if (targetRole === 'all') return true;
+        // If system alert, show it in all rooms
+        if (msg.is_alert) return true;
+        // Show if message is for this role OR from this role
+        return msg.recipient_role === targetRole || msg.sender_role === targetRole;
+    });
+
+    const availableRoles = roles.filter(role => {
+        if (role.id === 'all') return true;
+        // Don't show the user's own role as a target
+        if (user?.role === role.id) return false;
+        // Waiters shouldn't message each other (privacy/focus)
+        if (user?.role === 'staff' && role.id === 'staff') return false;
+        return true;
+    });
+
     return (
         <motion.div
             initial={{ x: '100%' }}
@@ -158,7 +181,7 @@ const ChatSidebar = ({ user, onClose }) => {
             <div className="px-6 py-4 bg-white/2 border-b border-white/5">
                 <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 mb-3">Target Department</p>
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                    {roles.map(role => (
+                    {availableRoles.map(role => (
                         <button
                             key={role.id}
                             onClick={() => setTargetRole(role.id)}
@@ -183,13 +206,13 @@ const ChatSidebar = ({ user, onClose }) => {
                         <Clock className="animate-spin" size={32} />
                         <p className="text-sm font-medium uppercase tracking-[0.2em]">Synchronizing...</p>
                     </div>
-                ) : messages.length === 0 ? (
+                ) : filteredMessages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center px-12 opacity-30">
                         <MessageSquare size={48} className="mb-4" />
-                        <p className="text-sm">No messages yet. Start a conversation with the team.</p>
+                        <p className="text-sm">No messages in this department yet.</p>
                     </div>
                 ) : (
-                    messages.map((msg, idx) => (
+                    filteredMessages.map((msg, idx) => (
                         <motion.div
                             key={msg.id || idx}
                             initial={{ opacity: 0, y: 10 }}

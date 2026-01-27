@@ -119,6 +119,7 @@ const WaiterDashboard = () => {
             };
 
             const handleNewChat = (data) => {
+                if (data.sender_id === user?.id) return;
                 if (!showChat) {
                     setNotifications(prev => [...prev, data]);
                     toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });

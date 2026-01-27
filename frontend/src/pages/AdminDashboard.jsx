@@ -278,6 +278,9 @@ const AdminDashboard = () => {
       });
 
       socket.on('new_chat_message', (data) => {
+        // Don't show notification for our own messages
+        if (data.sender_id === user?.id) return;
+
         if (!showChat) {
           setChatNotifications(prev => [...prev, data]);
           toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });
@@ -2372,7 +2375,7 @@ const AdminDashboard = () => {
       {/* Chat Sidebar */}
       < AnimatePresence >
         {showChat && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150]">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200]">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
             <ChatSidebar
               user={user}
