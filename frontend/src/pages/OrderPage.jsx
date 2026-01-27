@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, ChevronLeft, Trash2, Plus, Minus, Clock, MapPin, Receipt, CheckCircle2, Timer } from 'lucide-react';
+import { ShoppingBag, ChevronLeft, Trash2, Plus, Minus, Clock, MapPin, Receipt, CheckCircle2, Timer, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { ordersAPI, communicationAPI } from '../services/api.js';
+import { ordersAPI, communicationAPI, feedbackAPI } from '../services/api.js';
+import ReviewModal from '../components/Common/ReviewModal.jsx';
 import { ORDER_STATUS } from '../utils/constants.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import toast from 'react-hot-toast';
@@ -29,6 +30,26 @@ const OrderPage = () => {
   const [showCart, setShowCart] = useState(false);
   const [tableNumber, setTableNumber] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+
+  const handleReviewSubmit = async (data) => {
+    try {
+      setReviewLoading(true);
+      await feedbackAPI.create({
+        ...data,
+        food_id: reviewTarget.food_id,
+        order_id: reviewTarget.order_id
+      });
+      toast.success('Thank you for your feedback!');
+      setReviewTarget(null);
+    } catch (error) {
+      toast.error('Failed to submit review');
+      console.error(error);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
   const loadOrders = useCallback(async (showLoading = true) => {
     try {
@@ -232,7 +253,17 @@ const OrderPage = () => {
                             <div className="w-8 h-8 rounded-lg bg-surface-light flex items-center justify-center text-xs font-bold text-gold border border-white/5">
                               {item.quantity}x
                             </div>
-                            <span className="text-gray-300 font-medium group-hover/item:text-white transition-colors">{item.food_name}</span>
+                            <div>
+                              <span className="text-gray-300 font-medium group-hover/item:text-white transition-colors block">{item.food_name}</span>
+                              {order.status === 'served' && (
+                                <button
+                                  onClick={() => setReviewTarget({ food_id: item.food_id, order_id: order.id, food_name: item.food_name })}
+                                  className="text-[10px] text-gold hover:underline mt-1 flex items-center gap-1"
+                                >
+                                  <Star size={10} /> Leave a Review
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <span className="font-bold text-white">${item.subtotal}</span>
                         </li>
@@ -335,6 +366,15 @@ const OrderPage = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={!!reviewTarget}
+        onClose={() => setReviewTarget(null)}
+        onSubmit={handleReviewSubmit}
+        foodName={reviewTarget?.food_name}
+        loading={reviewLoading}
+      />
     </div>
   );
 };

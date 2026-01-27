@@ -72,7 +72,7 @@ export const ordersAPI = {
   create: (data) => api.post('/orders', data),
   getAll: (params) => api.get('/orders', { params }),
   getById: (id) => api.get(`/orders/${id}`),
-  updateStatus: (id, status, assigned_to) => api.put(`/orders/${id}/status`, { status, assigned_to }),
+  updateStatus: (id, data) => api.put(`/orders/${id}/status`, data),
   getPrepTimeAnalytics: () => api.get('/orders/analytics/prep-time'),
 };
 

@@ -187,6 +187,18 @@ export const updateOrderStatus = async (req, res, next) => {
       params.push(assigned_to || null);
     }
 
+    if (req.body.priority) {
+      paramCount++;
+      updateQuery += `, priority = $${paramCount}`;
+      params.push(req.body.priority);
+    }
+
+    if (req.body.total_amount) {
+      paramCount++;
+      updateQuery += `, total_amount = $${paramCount}`;
+      params.push(req.body.total_amount);
+    }
+
     updateQuery += ' WHERE id = $1 RETURNING *';
 
     const result = await pool.query(updateQuery, params);

@@ -611,13 +611,47 @@ const ManagerDashboard = () => {
                                     </div>
                                 </div>
                                 <div className="flex gap-3">
-                                    <button className="px-4 py-2 bg-green-500/20 text-green-500 rounded-lg text-xs font-bold hover:bg-green-500 hover:text-white transition-all">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await ordersAPI.updateStatus(order.id, { priority: 'high' });
+                                                toast.success('Priority approved');
+                                                loadData(false);
+                                            } catch (e) { toast.error('Failed to update priority'); }
+                                        }}
+                                        className="px-4 py-2 bg-green-500/20 text-green-500 rounded-lg text-xs font-bold hover:bg-green-500 hover:text-white transition-all"
+                                    >
                                         Approve Priority
                                     </button>
-                                    <button className="px-4 py-2 bg-red-500/20 text-red-500 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-all">
+                                    <button
+                                        onClick={async () => {
+                                            if (!confirm('Are you sure you want to cancel this order?')) return;
+                                            try {
+                                                await ordersAPI.updateStatus(order.id, { status: 'cancelled' });
+                                                toast.success('Order cancelled');
+                                                loadData(false);
+                                            } catch (e) { toast.error('Failed to cancel order'); }
+                                        }}
+                                        className="px-4 py-2 bg-red-500/20 text-red-500 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
+                                    >
                                         Cancel Order
                                     </button>
-                                    <button className="px-4 py-2 bg-gold/20 text-gold rounded-lg text-xs font-bold hover:bg-gold hover:text-black transition-all">
+                                    <button
+                                        onClick={async () => {
+                                            const discount = prompt('Enter discount percentage (e.g. 10 for 10%):');
+                                            if (discount && !isNaN(discount)) {
+                                                const newTotal = (parseFloat(order.total_amount) * (1 - parseFloat(discount) / 100)).toFixed(2);
+                                                if (confirm(`New total will be $${newTotal}. Apply?`)) {
+                                                    try {
+                                                        await ordersAPI.updateStatus(order.id, { total_amount: newTotal });
+                                                        toast.success(`Discount applied. New total: $${newTotal}`);
+                                                        loadData(false);
+                                                    } catch (e) { toast.error('Failed to apply discount'); }
+                                                }
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-gold/20 text-gold rounded-lg text-xs font-bold hover:bg-gold hover:text-black transition-all"
+                                    >
                                         Apply Discount
                                     </button>
                                 </div>
