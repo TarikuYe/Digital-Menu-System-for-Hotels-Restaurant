@@ -21,6 +21,8 @@ export const getAllUsers = async (req, res, next) => {
         if (role === USER_ROLES.MANAGER) {
             query += ` AND (u.branch_id = $1 OR u.branch_id IS NULL)`;
             params.push(branch_id);
+            // Managers cannot manage/see admins
+            query += ` AND u.role != 'admin'`;
         }
 
         query += ` ORDER BY u.created_at DESC`;

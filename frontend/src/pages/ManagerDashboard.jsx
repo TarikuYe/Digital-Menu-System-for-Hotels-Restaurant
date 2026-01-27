@@ -111,7 +111,8 @@ const ManagerDashboard = () => {
             setStats(statsRes.data);
             setActivity(activityRes.data || []);
             setStaff(staffRes.data.users?.filter(u =>
-                // Show all staff in same branch or global staff
+                // Show all staff in same branch or global staff, but exclude admin
+                u.role !== 'admin' &&
                 (user.role === 'admin' || !u.branch_id || u.branch_id === user.branch_id)
             ) || []);
             setOrders(ordersRes.data.orders || []);
@@ -566,10 +567,18 @@ const ManagerDashboard = () => {
                                     </div>
                                 </div>
                                 <div className="mt-4 pt-4 border-t border-white/5 flex gap-2">
-                                    <button className="flex-1 py-2 bg-white/10 rounded-lg text-xs font-bold hover:bg-white/20 transition-all">
+                                    <button
+                                        onClick={() => alert(`Details for ${member.full_name}:\nRole: ${member.role}\nEmail: ${member.email}\nPhone: ${member.phone || 'N/A'}`)}
+                                        className="flex-1 py-2 bg-white/10 rounded-lg text-xs font-bold hover:bg-white/20 transition-all"
+                                    >
                                         View Details
                                     </button>
-                                    <button className="flex-1 py-2 bg-gold/20 text-gold rounded-lg text-xs font-bold hover:bg-gold hover:text-black transition-all">
+                                    <button
+                                        onClick={() => {
+                                            alert("Shift assignment feature coming in next update"); // Placeholder for now or implement modal
+                                        }}
+                                        className="flex-1 py-2 bg-gold/20 text-gold rounded-lg text-xs font-bold hover:bg-gold hover:text-black transition-all"
+                                    >
                                         Assign Shift
                                     </button>
                                 </div>
