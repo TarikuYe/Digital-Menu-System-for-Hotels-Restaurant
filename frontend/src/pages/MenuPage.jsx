@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf } from 'lucide-react';
-import { foodsAPI, menusAPI, ordersAPI } from '../services/api.js';
+import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf, Bell } from 'lucide-react';
+import { foodsAPI, menusAPI, ordersAPI, communicationAPI } from '../services/api.js';
 import FoodCard from '../components/Menu/FoodCard.jsx';
 import LanguageSelector from '../components/Menu/LanguageSelector.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import toast from 'react-hot-toast';
 
 const MenuPage = () => {
+  const { user } = useAuth();
   const [menus, setMenus] = useState([]);
   const [foods, setFoods] = useState([]);
   const [selectedMenu, setSelectedMenu] = useState(null);
@@ -71,6 +74,21 @@ const MenuPage = () => {
     food.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     food.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleCallWaiter = async () => {
+    try {
+      await communicationAPI.sendStaffAlert({
+        recipient_role: 'staff',
+        title: 'Table Service Request',
+        message: `Guest at Table ${user?.table_number || 'N/A'} needs assistance.`,
+        priority: 'high',
+        table_number: user?.table_number
+      });
+      toast.success('Your request has been sent to the staff!', { icon: '👋' });
+    } catch (e) {
+      toast.error('Failed to call waiter. Please try again.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-brand-dark text-white">
@@ -250,6 +268,21 @@ const MenuPage = () => {
           </main>
         </div>
       </div>
+
+      {/* Floating Call Waiter Button */}
+      <motion.button
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={handleCallWaiter}
+        className="fixed bottom-8 right-8 z-[100] w-16 h-16 rounded-full bg-gold text-black shadow-[0_10px_40px_rgba(212,175,55,0.4)] border-4 border-brand-dark flex items-center justify-center group"
+      >
+        <Bell size={24} className="group-hover:animate-ring" />
+        <span className="absolute right-full mr-4 px-4 py-2 bg-brand-dark/90 backdrop-blur-md border border-gold/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+          Call Waiter
+        </span>
+      </motion.button>
     </div>
   );
 };

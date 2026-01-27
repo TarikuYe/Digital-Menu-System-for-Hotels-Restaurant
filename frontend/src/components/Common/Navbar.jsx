@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Utensils, ClipboardList, LayoutDashboard, Flame, LogOut, User as UserIcon, ChefHat, DollarSign } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
+import { getRoleDashboard } from '../../utils/roleRedirect.js';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated, isAdmin } = useAuth();
@@ -31,7 +32,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20">
           <div className="flex items-center gap-8">
-            <Link to="/menu" className="flex items-center gap-2 group">
+            <Link to={getRoleDashboard(user)} className="flex items-center gap-2 group">
               <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center text-gold group-hover:scale-110 transition-transform">
                 <Utensils size={20} />
               </div>

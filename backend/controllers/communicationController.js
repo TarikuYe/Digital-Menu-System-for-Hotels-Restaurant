@@ -79,7 +79,7 @@ export const getNotifications = async (req, res, next) => {
 
 export const sendStaffAlert = async (req, res, next) => {
     try {
-        const { recipient_role, title, message, priority } = req.body;
+        const { recipient_role, title, message, priority, table_number } = req.body;
 
         // Get all users with that role
         const staffRes = await pool.query('SELECT id FROM users WHERE role = $1', [recipient_role]);
@@ -101,10 +101,89 @@ export const sendStaffAlert = async (req, res, next) => {
             params
         );
 
+        // Also save to messages table for chat history
+        // If it's a guest, we leave sender_id as NULL because of the foreign key constraint
+        await pool.query(
+            `INSERT INTO messages (sender_id, recipient_role, message, priority, table_number)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [req.user.isGuest ? null : req.user.id, recipient_role, message, priority || 'info', table_number || null]
+        );
+
         // Emit real-time alert to the role
-        emitToRole(recipient_role, 'staff_alert', { title, message, priority: priority || 'high' });
+        emitToRole(recipient_role, 'staff_alert', {
+            title,
+            message,
+            priority: priority || 'high',
+            sender: req.user.full_name,
+            table_number: table_number || null,
+            created_at: new Date()
+        });
 
         res.json({ message: `Alert sent to ${staffIds.length} staff members` });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// --- Real-time Chat ---
+
+export const getMessages = async (req, res, next) => {
+    try {
+        const result = await pool.query(
+            `SELECT m.*, u.full_name as sender_name, u.role as sender_role 
+             FROM messages m 
+             LEFT JOIN users u ON m.sender_id = u.id 
+             WHERE m.recipient_role = $1 OR m.recipient_role = 'all' OR (m.sender_id IS NOT NULL AND m.sender_id = $2)
+             ORDER BY m.created_at DESC LIMIT 100`,
+            [req.user.role, req.user.isGuest ? null : req.user.id]
+        );
+
+        // Post-process to handle guest messages that have no sender_name from the join
+        const messages = result.rows.map(msg => {
+            if (!msg.sender_id && !msg.sender_name) {
+                return {
+                    ...msg,
+                    sender_name: msg.table_number ? `Guest @ Table ${msg.table_number}` : 'Guest',
+                    sender_role: 'guest'
+                };
+            }
+            return msg;
+        });
+
+        res.json({ messages: messages.reverse() });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const sendMessage = async (req, res, next) => {
+    try {
+        const { recipient_role, message, priority, table_number } = req.body;
+
+        const result = await pool.query(
+            `INSERT INTO messages (sender_id, recipient_role, message, priority, table_number)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [req.user.isGuest ? null : req.user.id, recipient_role, message, priority || 'info', table_number || null]
+        );
+
+        const savedMessage = result.rows[0];
+
+        // Add sender info for UI
+        savedMessage.sender_name = req.user.full_name;
+        savedMessage.sender_role = req.user.role;
+
+        // Emit to target role
+        if (recipient_role === 'all') {
+            emitToAll('new_chat_message', savedMessage);
+        } else {
+            emitToRole(recipient_role, 'new_chat_message', savedMessage);
+            // Also emit to sender (if they are not in the target role room)
+            // But since staff join their own role room, we might need to handle this.
+            // For now, emitToRole should cover it if sender has same role.
+        }
+
+        res.status(201).json({ message: 'Message sent', chatMessage: savedMessage });
     } catch (error) {
         next(error);
     }

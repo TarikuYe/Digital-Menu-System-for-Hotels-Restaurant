@@ -169,6 +169,8 @@ export const communicationAPI = {
   sendStaffAlert: (data) => api.post('/communications/staff-alert', data),
   getNotifications: () => api.get('/communications/notifications'),
   markRead: (id) => api.patch(`/communications/notifications/${id}/read`),
+  getMessages: () => api.get('/communications/messages'),
+  sendMessage: (data) => api.post('/communications/messages', data),
   getSettings: () => api.get('/communications/settings'),
   updateSettings: (data) => api.put('/communications/settings', data),
 };

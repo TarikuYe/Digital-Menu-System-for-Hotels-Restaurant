@@ -55,10 +55,28 @@ import {
 import { ORDER_STATUS, SPICE_LEVELS, USER_ROLES } from '../utils/constants.js';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import ChatSidebar from '../components/Waiter/ChatSidebar.jsx';
 
 const AdminDashboard = () => {
   const { socket } = useSocket();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('orders');
+  const [showChat, setShowChat] = useState(false);
+  const [chatNotifications, setChatNotifications] = useState([]);
+
+  const playNotificationSound = useCallback((priority = 'info') => {
+    try {
+      const soundUrl = priority === 'high'
+        ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+        : 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+      const audio = new Audio(soundUrl);
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('Audio play blocked'));
+    } catch (e) {
+      console.error('Audio failed');
+    }
+  }, []);
   const [menus, setMenus] = useState([]);
   const [foods, setFoods] = useState([]);
   const [feedback, setFeedback] = useState([]);
@@ -250,12 +268,29 @@ const AdminDashboard = () => {
       socket.on('order_status_updated', handleUpdate);
       socket.on('new_announcement', (data) => {
         toast(data.title, { icon: '📣' });
+        playNotificationSound('info');
         if (activeTab === 'communications') loadData(false);
+      });
+
+      socket.on('staff_alert', (data) => {
+        toast(data.message, { icon: '📢' });
+        playNotificationSound('high');
+      });
+
+      socket.on('new_chat_message', (data) => {
+        if (!showChat) {
+          setChatNotifications(prev => [...prev, data]);
+          toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });
+          playNotificationSound(data.priority === 'urgent' ? 'high' : 'info');
+        }
       });
 
       return () => {
         socket.off('new_order', handleNewOrder);
         socket.off('order_status_updated', handleUpdate);
+        socket.off('new_announcement');
+        socket.off('staff_alert');
+        socket.off('new_chat_message');
       };
     }
   }, [socket, activeTab, loadData]);
@@ -471,6 +506,21 @@ const AdminDashboard = () => {
               <Plus size={16} /> New Language
             </button>
           )}
+
+          <button
+            onClick={() => {
+              setShowChat(true);
+              setChatNotifications([]);
+            }}
+            className="premium-button !py-2.5 !px-6 text-xs uppercase tracking-widest flex items-center gap-2 relative bg-purple-600/20 border-purple-400/30 text-purple-400 hover:bg-purple-600 hover:text-white transition-all"
+          >
+            <MessageSquare size={16} /> Chat
+            {chatNotifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-gold text-black text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                {chatNotifications.length}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
@@ -2153,153 +2203,154 @@ const AdminDashboard = () => {
                   </div>
                 )}
 
-
                 {(formType === 'food' || formType === 'menu') && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Description</label>
-                    <textarea
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors h-24"
-                      value={formData.description}
-                      onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    />
-                  </div>
-                )}
-
-                {formType === 'food' && (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Category</label>
-                        <select
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
-                          value={formData.menu_id}
-                          onChange={e => setFormData({ ...formData, menu_id: e.target.value })}
-                          required
-                        >
-                          <option value="">Select Category</option>
-                          {menus.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Spice Level</label>
-                        <select
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
-                          value={formData.spice_level}
-                          onChange={e => setFormData({ ...formData, spice_level: parseInt(e.target.value) })}
-                        >
-                          {Object.entries(SPICE_LEVELS).map(([val, info]) => (
-                            <option key={val} value={val}>{info.emoji} {info.label}</option>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Description</label>
+                      <textarea
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors h-24"
+                        value={formData.description}
+                        onChange={e => setFormData({ ...formData, description: e.target.value })}
+                      />
+                    </div>
+
+                    {formType === 'food' && (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Category</label>
+                            <select
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                              value={formData.menu_id}
+                              onChange={e => setFormData({ ...formData, menu_id: e.target.value })}
+                              required
+                            >
+                              <option value="">Select Category</option>
+                              {menus.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Spice Level</label>
+                            <select
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                              value={formData.spice_level}
+                              onChange={e => setFormData({ ...formData, spice_level: parseInt(e.target.value) })}
+                            >
+                              {Object.entries(SPICE_LEVELS).map(([val, info]) => (
+                                <option key={val} value={val}>{info.emoji} {info.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
+                          {['is_vegetarian', 'is_vegan', 'is_gluten_free', 'is_special', 'is_recommended', 'is_available'].map(key => (
+                            <label key={key} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData[key]}
+                                onChange={e => setFormData({ ...formData, [key]: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
+                              />
+                              <span className="text-[10px] font-bold uppercase tracking-wider">
+                                {key.replace('is_', '').replace('_', ' ')}
+                              </span>
+                            </label>
                           ))}
-                        </select>
-                      </div>
-                    </div>
+                        </div>
 
-                    <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
-                      {['is_vegetarian', 'is_vegan', 'is_gluten_free', 'is_special', 'is_recommended', 'is_available'].map(key => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData[key]}
-                            onChange={e => setFormData({ ...formData, [key]: e.target.checked })}
-                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
-                          />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">
-                            {key.replace('is_', '').replace('_', ' ')}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                        Ingredients & Allergens
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-4 bg-white/5 rounded-xl border border-white/5">
-                        {allIngredients.map(ingredient => (
-                          <label key={ingredient.id} className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={formData.ingredient_ids?.includes(ingredient.id)}
-                              onChange={e => {
-                                const ids = formData.ingredient_ids || [];
-                                if (e.target.checked) setFormData({ ...formData, ingredient_ids: [...ids, ingredient.id] });
-                                else setFormData({ ...formData, ingredient_ids: ids.filter(id => id !== ingredient.id) });
-                              }}
-                              className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
-                            />
-                            <span className="text-xs">{ingredient.name}</span>
-                            {ingredient.allergen_type && <span className="text-[8px] px-1 bg-red-500/20 text-red-400 rounded uppercase font-bold">{ingredient.allergen_type}</span>}
+                        <div className="space-y-3">
+                          <label className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                            Ingredients & Allergens
                           </label>
-                        ))}
-                      </div>
-                    </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-4 bg-white/5 rounded-xl border border-white/5">
+                            {allIngredients.map(ingredient => (
+                              <label key={ingredient.id} className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.ingredient_ids?.includes(ingredient.id)}
+                                  onChange={e => {
+                                    const ids = formData.ingredient_ids || [];
+                                    if (e.target.checked) setFormData({ ...formData, ingredient_ids: [...ids, ingredient.id] });
+                                    else setFormData({ ...formData, ingredient_ids: ids.filter(id => id !== ingredient.id) });
+                                  }}
+                                  className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
+                                />
+                                <span className="text-xs">{ingredient.name}</span>
+                                {ingredient.allergen_type && <span className="text-[8px] px-1 bg-red-500/20 text-red-400 rounded uppercase font-bold">{ingredient.allergen_type}</span>}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Available From</label>
-                        <input
-                          type="time"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
-                          value={formData.available_from || ''}
-                          onChange={e => setFormData({ ...formData, available_from: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Available Until</label>
-                        <input
-                          type="time"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
-                          value={formData.available_until || ''}
-                          onChange={e => setFormData({ ...formData, available_until: e.target.value })}
-                        />
-                      </div>
-                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Available From</label>
+                            <input
+                              type="time"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                              value={formData.available_from || ''}
+                              onChange={e => setFormData({ ...formData, available_from: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Available Until</label>
+                            <input
+                              type="time"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                              value={formData.available_until || ''}
+                              onChange={e => setFormData({ ...formData, available_until: e.target.value })}
+                            />
+                          </div>
+                        </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Image URL</label>
-                      <input
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
-                        value={formData.image_url || ''}
-                        onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                        placeholder="https://example.com/image.jpg"
-                      />
-                    </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Image URL</label>
+                          <input
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors"
+                            value={formData.image_url || ''}
+                            onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {formType === 'menu' && (
+                      <label className="flex items-center gap-2 cursor-pointer p-4 rounded-xl bg-white/5 border border-white/5">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_active}
+                          onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
+                        />
+                        <span className="text-sm font-medium">Active (Visible to customers)</span>
+                      </label>
+                    )}
+
+                    {formType === 'food' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Seasonal Start</label>
+                          <input
+                            type="date"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors text-white"
+                            value={formData.seasonal_start ? new Date(formData.seasonal_start).toISOString().split('T')[0] : ''}
+                            onChange={e => setFormData({ ...formData, seasonal_start: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Seasonal End</label>
+                          <input
+                            type="date"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors text-white"
+                            value={formData.seasonal_end ? new Date(formData.seasonal_end).toISOString().split('T')[0] : ''}
+                            onChange={e => setFormData({ ...formData, seasonal_end: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </>
-                )}
-
-                {formType === 'menu' && (
-                  <label className="flex items-center gap-2 cursor-pointer p-4 rounded-xl bg-white/5 border border-white/5">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-gold focus:ring-gold"
-                    />
-                    <span className="text-sm font-medium">Active (Visible to customers)</span>
-                  </label>
-                )}
-
-                {formType === 'food' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-white/5">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Seasonal Start</label>
-                      <input
-                        type="date"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors text-white"
-                        value={formData.seasonal_start ? new Date(formData.seasonal_start).toISOString().split('T')[0] : ''}
-                        onChange={e => setFormData({ ...formData, seasonal_start: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-gray-400">Seasonal End</label>
-                      <input
-                        type="date"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:border-gold outline-none transition-colors text-white"
-                        value={formData.seasonal_end ? new Date(formData.seasonal_end).toISOString().split('T')[0] : ''}
-                        onChange={e => setFormData({ ...formData, seasonal_end: e.target.value })}
-                      />
-                    </div>
-                  </div>
                 )}
 
                 <button
@@ -2310,14 +2361,30 @@ const AdminDashboard = () => {
                   {formLoading ? <Clock className="animate-spin" /> : <Save />}
                   Save {formType === 'food' ? 'Dish' : formType === 'menu' ? 'Menu' : 'User'}
                 </button>
-
               </form>
 
-            </motion.div>
+            </motion.div >
+          </motion.div >
+        )
+        }
+      </AnimatePresence >
+
+      {/* Chat Sidebar */}
+      < AnimatePresence >
+        {showChat && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150]">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
+            <ChatSidebar
+              user={user}
+              onClose={() => {
+                setShowChat(false);
+                setChatNotifications([]);
+              }}
+            />
           </motion.div>
         )}
-      </AnimatePresence>
-    </div >
+      </AnimatePresence >
+    </div>
   );
 };
 

@@ -212,7 +212,7 @@ const FoodDetailModal = ({ food, onClose }) => {
                         ? 'border-red-500 bg-red-500/20 text-red-500'
                         : 'border-white/10 bg-white/5 text-gray-400 hover:border-white/20'}`}
                   >
-                    {SPICE_LEVELS[level]}
+                    {SPICE_LEVELS[level].emoji} {SPICE_LEVELS[level].label}
                   </button>
                 ))}
               </div>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, ChevronLeft, Trash2, Plus, Minus, Clock, MapPin, Receipt, CheckCircle2, Timer } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { ordersAPI } from '../services/api.js';
+import { ordersAPI, communicationAPI } from '../services/api.js';
 import { ORDER_STATUS } from '../utils/constants.js';
 import { useSocket } from '../context/SocketContext.jsx';
 import toast from 'react-hot-toast';

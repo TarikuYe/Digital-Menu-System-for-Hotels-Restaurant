@@ -37,6 +37,9 @@ import {
 import { managerAPI, ordersAPI, adminAPI, feedbackAPI, paymentsAPI, tablesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { useSocket } from '../context/SocketContext';
+import ChatSidebar from '../components/Waiter/ChatSidebar';
+import { useCallback } from 'react';
 
 const ManagerDashboard = () => {
     const { user } = useAuth();
@@ -59,6 +62,22 @@ const ManagerDashboard = () => {
     const [notifications, setNotifications] = useState([]);
     const [showApprovalModal, setShowApprovalModal] = useState(null);
     const [selectedPeriod, setSelectedPeriod] = useState('today'); // today, week, month
+    const { socket } = useSocket();
+    const [showChat, setShowChat] = useState(false);
+    const [chatNotifications, setChatNotifications] = useState([]);
+
+    const playNotificationSound = useCallback((priority = 'info') => {
+        try {
+            const soundUrl = priority === 'high'
+                ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+                : 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+            const audio = new Audio(soundUrl);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio play blocked'));
+        } catch (e) {
+            console.error('Audio failed');
+        }
+    }, []);
 
     const loadData = async () => {
         try {
@@ -125,6 +144,39 @@ const ManagerDashboard = () => {
         const interval = setInterval(loadData, 30000); // Refresh every 30s
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (socket) {
+            const handleNewOrder = (data) => {
+                toast.success(data.message || 'New order placed!', { icon: '💰' });
+                playNotificationSound('info');
+                loadData();
+            };
+
+            const handleAlert = (data) => {
+                toast(data.message, { icon: '📢' });
+                playNotificationSound('high');
+            };
+
+            const handleNewChat = (data) => {
+                if (!showChat) {
+                    setChatNotifications(prev => [...prev, data]);
+                    toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });
+                    playNotificationSound(data.priority === 'urgent' ? 'high' : 'info');
+                }
+            };
+
+            socket.on('new_order', handleNewOrder);
+            socket.on('staff_alert', handleAlert);
+            socket.on('new_chat_message', handleNewChat);
+
+            return () => {
+                socket.off('new_order', handleNewOrder);
+                socket.off('staff_alert', handleAlert);
+                socket.off('new_chat_message', handleNewChat);
+            };
+        }
+    }, [socket, showChat]);
 
     const handleApproveDiscount = async (orderId, discountAmount) => {
         try {
@@ -236,6 +288,21 @@ const ManagerDashboard = () => {
                             )}
                         </button>
                     </div>
+                    <button
+                        onClick={() => {
+                            setShowChat(true);
+                            setChatNotifications([]);
+                        }}
+                        className="premium-button !py-2 !px-6 flex items-center gap-2 text-xs uppercase relative"
+                    >
+                        <MessageSquare size={16} />
+                        Chat
+                        {chatNotifications.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-gold text-black text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                {chatNotifications.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
             </header>
 
@@ -332,8 +399,8 @@ const ManagerDashboard = () => {
                                 <div key={index} className="p-4 bg-white/5 rounded-xl flex justify-between items-center">
                                     <div className="flex items-center gap-4">
                                         <div className={`w-3 h-3 rounded-full ${item.status === 'pending' ? 'bg-yellow-500' :
-                                                item.status === 'preparing' ? 'bg-blue-500' :
-                                                    item.status === 'ready' ? 'bg-green-500' : 'bg-gray-500'
+                                            item.status === 'preparing' ? 'bg-blue-500' :
+                                                item.status === 'ready' ? 'bg-green-500' : 'bg-gray-500'
                                             }`} />
                                         <div>
                                             <p className="font-bold">
@@ -619,6 +686,22 @@ const ManagerDashboard = () => {
                     </div>
                 </div>
             )}
+
+            {/* Chat Sidebar */}
+            <AnimatePresence>
+                {showChat && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200]">
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
+                        <ChatSidebar
+                            user={user}
+                            onClose={() => {
+                                setShowChat(false);
+                                setChatNotifications([]);
+                            }}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

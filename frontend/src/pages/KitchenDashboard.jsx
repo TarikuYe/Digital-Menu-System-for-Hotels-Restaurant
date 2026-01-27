@@ -17,13 +17,16 @@ import {
     AlertTriangle,
     History,
     Info,
-    Activity
+    Activity,
+    MessageSquare
 } from 'lucide-react';
 
 import { kitchenAPI, foodsAPI } from '../services/api.js';
 import { ORDER_STATUS } from '../utils/constants.js';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import ChatSidebar from '../components/Waiter/ChatSidebar.jsx';
 
 const KitchenDashboard = () => {
     const [orders, setOrders] = useState([]);
@@ -31,6 +34,9 @@ const KitchenDashboard = () => {
     const [peakHour, setPeakHour] = useState(null);
     const [kitchenLoad, setKitchenLoad] = useState('normal');
     const [loading, setLoading] = useState(true);
+    const [showChat, setShowChat] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const { user } = useAuth();
 
     const [activeFilter, setActiveFilter] = useState('all');
     const [inventory, setInventory] = useState([]);
@@ -38,6 +44,19 @@ const KitchenDashboard = () => {
     const [logType, setLogType] = useState('hygiene');
 
     const { socket } = useSocket();
+
+    const playNotificationSound = useCallback((priority = 'info') => {
+        try {
+            const soundUrl = priority === 'high'
+                ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
+                : 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+            const audio = new Audio(soundUrl);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio play blocked'));
+        } catch (e) {
+            console.error('Audio failed');
+        }
+    }, []);
 
     const loadData = useCallback(async (showLoading = true) => {
         try {
@@ -71,6 +90,7 @@ const KitchenDashboard = () => {
                     icon: '🍳',
                     duration: 5000
                 });
+                playNotificationSound('info');
                 loadData(false); // Background update
             };
 
@@ -87,16 +107,28 @@ const KitchenDashboard = () => {
                         color: '#fff',
                     },
                 });
+                setNotifications(prev => [...prev, data]);
+                playNotificationSound('high');
+            };
+
+            const handleNewChat = (data) => {
+                if (!showChat) {
+                    setNotifications(prev => [...prev, data]);
+                    toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });
+                    playNotificationSound(data.priority === 'urgent' ? 'high' : 'info');
+                }
             };
 
             socket.on('new_order', handleNewOrder);
             socket.on('order_status_updated', handleStatusUpdate);
             socket.on('staff_alert', handleAlert);
+            socket.on('new_chat_message', handleNewChat);
 
             return () => {
                 socket.off('new_order', handleNewOrder);
                 socket.off('order_status_updated', handleStatusUpdate);
                 socket.off('staff_alert', handleAlert);
+                socket.off('new_chat_message', handleNewChat);
             };
         }
     }, [socket, loadData]);
@@ -175,6 +207,24 @@ const KitchenDashboard = () => {
                             <p className="text-xl font-black">{peakHour ? `${peakHour.peak_hour}:00` : '...'}</p>
                         </div>
                     </div>
+                    <button
+                        onClick={() => {
+                            setShowChat(true);
+                            setNotifications([]);
+                        }}
+                        className="glass-card flex items-center gap-4 px-6 py-3 border-l-4 border-gold bg-gold/5 relative group hover:bg-gold/10 transition-all"
+                    >
+                        <MessageSquare className="text-gold" size={24} />
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Team Chat</p>
+                            <p className="text-xs font-bold uppercase">{notifications.length > 0 ? `${notifications.length} New` : 'Open Feed'}</p>
+                        </div>
+                        {notifications.length > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent-red text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-bounce shadow-lg">
+                                {notifications.length}
+                            </span>
+                        )}
+                    </button>
                     <button
                         onClick={() => setShowLogModal(true)}
                         className="premium-button !py-3 !px-8 flex items-center gap-2 text-xs uppercase tracking-widest"
@@ -425,6 +475,22 @@ const KitchenDashboard = () => {
                                 </div>
                             </div>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Chat Sidebar */}
+            <AnimatePresence>
+                {showChat && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150]">
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
+                        <ChatSidebar
+                            user={user}
+                            onClose={() => {
+                                setShowChat(false);
+                                setNotifications([]);
+                            }}
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>

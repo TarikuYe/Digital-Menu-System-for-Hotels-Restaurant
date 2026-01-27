@@ -34,6 +34,7 @@ import { tablesAPI, ordersAPI, foodsAPI, menusAPI, communicationAPI } from '../s
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext';
+import ChatSidebar from '../components/Waiter/ChatSidebar';
 
 const WaiterDashboard = () => {
     const { user } = useAuth();
@@ -54,6 +55,19 @@ const WaiterDashboard = () => {
     const [showChat, setShowChat] = useState(false);
     const [chatMessage, setChatMessage] = useState('');
     const [stats, setStats] = useState({ ordersServed: 0, avgServiceTime: 0 });
+
+    const playNotificationSound = useCallback((priority = 'info') => {
+        try {
+            const soundUrl = priority === 'high'
+                ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' // Urgent alert
+                : 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'; // Standard notification
+            const audio = new Audio(soundUrl);
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio play blocked by browser'));
+        } catch (e) {
+            console.error('Failed to play sound');
+        }
+    }, []);
 
     const loadData = useCallback(async (showLoading = true) => {
         try {
@@ -82,6 +96,7 @@ const WaiterDashboard = () => {
         if (socket) {
             const handleNewOrder = (data) => {
                 toast.success(data.message || 'New order received!', { icon: '📝' });
+                playNotificationSound('info');
                 loadData(false);
             };
 
@@ -92,22 +107,35 @@ const WaiterDashboard = () => {
                         icon: '🔔',
                         duration: 6000
                     });
+                    playNotificationSound('high');
                 }
                 loadData(false);
             };
 
             const handleAlert = (data) => {
                 toast(data.message, { icon: '📢', style: { border: '1px solid #D4AF37' } });
+                setNotifications(prev => [...prev, data]);
+                playNotificationSound(data.priority === 'urgent' || data.priority === 'high' ? 'high' : 'info');
+            };
+
+            const handleNewChat = (data) => {
+                if (!showChat) {
+                    setNotifications(prev => [...prev, data]);
+                    toast(`${data.sender_name}: ${data.message.slice(0, 30)}...`, { icon: '💬' });
+                    playNotificationSound(data.priority === 'urgent' ? 'high' : 'info');
+                }
             };
 
             socket.on('new_order', handleNewOrder);
             socket.on('order_status_updated', handleStatusUpdate);
             socket.on('staff_alert', handleAlert);
+            socket.on('new_chat_message', handleNewChat);
 
             return () => {
                 socket.off('new_order', handleNewOrder);
                 socket.off('order_status_updated', handleStatusUpdate);
                 socket.off('staff_alert', handleAlert);
+                socket.off('new_chat_message', handleNewChat);
             };
         }
     }, [socket, loadData]);
@@ -640,6 +668,22 @@ const WaiterDashboard = () => {
                                 Add to Order
                             </button>
                         </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Chat Sidebar */}
+            <AnimatePresence>
+                {showChat && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150]">
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowChat(false)} />
+                        <ChatSidebar
+                            user={user}
+                            onClose={() => {
+                                setShowChat(false);
+                                setNotifications([]); // Clear unread on close
+                            }}
+                        />
                     </motion.div>
                 )}
             </AnimatePresence>
