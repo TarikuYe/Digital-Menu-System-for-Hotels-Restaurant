@@ -117,9 +117,20 @@ const WaiterDashboard = () => {
             };
 
             const handleAlert = (data) => {
-                toast(data.message, { icon: '📢', style: { border: '1px solid #D4AF37' } });
-                setNotifications(prev => [...prev, data]);
-                playNotificationSound(data.priority === 'urgent' || data.priority === 'high' ? 'high' : 'info');
+                const isAssignedToMe = data.assigned_to === user?.id;
+                const message = isAssignedToMe ? `🎯 ASSIGNED TO YOU: ${data.message}` : data.message;
+
+                toast(message, {
+                    icon: isAssignedToMe ? '🎯' : '📢',
+                    style: {
+                        border: isAssignedToMe ? '2px solid #D4AF37' : '1px solid rgba(255,255,255,0.1)',
+                        background: isAssignedToMe ? '#1a1a1a' : undefined
+                    },
+                    duration: isAssignedToMe ? 8000 : 5000
+                });
+
+                setNotifications(prev => [...prev, { ...data, isAssignedToMe }]);
+                playNotificationSound(isAssignedToMe || data.priority === 'urgent' || data.priority === 'high' ? 'high' : 'info');
             };
 
             const handleNewChat = (data) => {
@@ -135,6 +146,10 @@ const WaiterDashboard = () => {
             socket.on('order_status_updated', handleStatusUpdate);
             socket.on('staff_alert', handleAlert);
             socket.on('new_chat_message', handleNewChat);
+            socket.on('table_status_updated', (data) => {
+                toast(`Table ${data.table_number} is now ${data.status}`, { icon: '🍽️' });
+                loadData(false);
+            });
             socket.on('user_status_updated', (data) => {
                 setStaffList(prev => prev.map(s => s.id === data.id ? { ...s, status: data.status } : s));
             });
@@ -144,6 +159,7 @@ const WaiterDashboard = () => {
                 socket.off('order_status_updated', handleStatusUpdate);
                 socket.off('staff_alert', handleAlert);
                 socket.off('new_chat_message', handleNewChat);
+                socket.off('table_status_updated');
                 socket.off('user_status_updated');
             };
         }

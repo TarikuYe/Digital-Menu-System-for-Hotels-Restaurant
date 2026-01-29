@@ -81,74 +81,104 @@ export const sendStaffAlert = async (req, res, next) => {
     try {
         const { recipient_role, title, message, priority, table_number } = req.body;
 
-        // Get all users with that role
-        // Also include 'waiter' role just in case, or broaden if it's a general alert
-        const staffRes = await pool.query(
-            "SELECT id FROM users WHERE role = $1 OR (role = 'waiter' AND $1 = 'staff')",
-            [recipient_role]
-        );
-        const staffIds = staffRes.rows.map(s => s.id);
+        // If it's a table service request, we update the table status automatically
+        if (table_number) {
+            await pool.query(
+                "UPDATE restaurant_tables SET status = 'occupied', updated_at = CURRENT_TIMESTAMP WHERE table_number = $1 AND status = 'available'",
+                [table_number]
+            );
+            // Notify all staff that table status changed
+            emitToRole('staff', 'table_status_updated', { table_number, status: 'occupied' });
+            emitToRole('waiter', 'table_status_updated', { table_number, status: 'occupied' });
+            emitToRole('manager', 'table_status_updated', { table_number, status: 'occupied' });
+            emitToRole('admin', 'table_status_updated', { table_number, status: 'occupied' });
+        }
 
-        console.log(`🔔 Sending staff alert to ${staffIds.length} users with role: ${recipient_role}`);
+        // Logic to find a specific online waiter if the role is staff/waiter
+        let targetStaffIds = [];
+        let assignedWaiter = null;
 
-        if (staffIds.length === 0) {
-            // If no targeted staff, maybe notify managers?
+        if (recipient_role === 'staff' || recipient_role === 'waiter') {
+            // Find one online waiter first (least busy could be better, but let's start with any online)
+            const onlineWaiterRes = await pool.query(
+                "SELECT id, full_name FROM users WHERE (role = 'staff' OR role = 'waiter') AND status = 'online' LIMIT 1"
+            );
+
+            if (onlineWaiterRes.rows.length > 0) {
+                assignedWaiter = onlineWaiterRes.rows[0];
+                targetStaffIds = [assignedWaiter.id];
+                console.log(`🎯 Assigned specific online waiter: ${assignedWaiter.full_name} (${assignedWaiter.id})`);
+            }
+        }
+
+        // Fallback: Notify all staff with the role if no specific waiter assigned
+        if (targetStaffIds.length === 0) {
+            const staffRes = await pool.query(
+                "SELECT id FROM users WHERE role = $1 OR (role = 'waiter' AND $1 = 'staff')",
+                [recipient_role]
+            );
+            targetStaffIds = staffRes.rows.map(s => s.id);
+        }
+
+        console.log(`🔔 Sending staff alert to ${targetStaffIds.length} users. Assigned: ${assignedWaiter?.full_name || 'None'}`);
+
+        if (targetStaffIds.length === 0) {
             console.log(`⚠️ No ${recipient_role} found. Falling back to managers.`);
             const managerRes = await pool.query("SELECT id FROM users WHERE role = 'manager' OR role = 'admin'");
-            staffIds.push(...managerRes.rows.map(m => m.id));
+            targetStaffIds = managerRes.rows.map(m => m.id);
         }
 
         // Create individual notifications
-        const values = staffIds.map((id, idx) => `($${idx * 5 + 1}, $${idx * 5 + 2}, $${idx * 5 + 3}, $${idx * 5 + 4}, $${idx * 5 + 5})`).join(', ');
-        const params = [];
-        staffIds.forEach(id => {
-            params.push(id, 'system', title, message, priority || 'high');
-        });
-
-        await pool.query(
-            `INSERT INTO notifications (user_id, notification_type, title, message, priority) VALUES ${values}`,
-            params
-        );
-
-        // Also save to messages table for chat history
-        // If it's a guest, we leave sender_id as NULL because of the foreign key constraint
-        await pool.query(
-            `INSERT INTO messages (sender_id, recipient_role, message, priority, table_number)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [req.user.isGuest ? null : req.user.id, recipient_role, message, priority || 'info', table_number || null]
-        );
-
-        // Emit real-time alert to the role
-        emitToRole(recipient_role, 'staff_alert', {
-            title,
-            message,
-            priority: priority || 'high',
-            sender: req.user.full_name,
-            table_number: table_number || null,
-            created_at: new Date()
-        });
-
-        // Also emit to 'admin' and 'manager' for oversight if it's high priority
-        if (priority === 'high' && recipient_role !== 'admin') {
-            emitToRole('manager', 'staff_alert', {
-                title: `[Manager Alert] ${title}`,
-                message,
-                priority,
-                sender: req.user.full_name,
-                table_number: table_number || null,
-                created_at: new Date()
+        if (targetStaffIds.length > 0) {
+            const values = targetStaffIds.map((id, idx) => `($${idx * 5 + 1}, $${idx * 5 + 2}, $${idx * 5 + 3}, $${idx * 5 + 4}, $${idx * 5 + 5})`).join(', ');
+            const params = [];
+            targetStaffIds.forEach(id => {
+                params.push(id, 'system', title, message, priority || 'high');
             });
-            emitToRole('admin', 'staff_alert', {
-                title: `[Admin Alert] ${title}`,
-                message,
-                priority,
-                sender: req.user.full_name,
-                table_number: table_number || null,
-                created_at: new Date()
-            });
+
+            await pool.query(
+                `INSERT INTO notifications (user_id, notification_type, title, message, priority) VALUES ${values}`,
+                params
+            );
         }
 
-        res.json({ message: `Alert sent to ${staffIds.length} staff members` });
+        // Save to messages table for chat history
+        const senderName = req.user?.isGuest ? `Guest @ Table ${table_number}` : (req.user?.full_name || 'System');
+        await pool.query(
+            `INSERT INTO messages (sender_id, recipient_role, recipient_id, message, priority, table_number)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [req.user?.isGuest ? null : req.user?.id, recipient_role, assignedWaiter?.id || null, message, priority || 'info', table_number || null]
+        );
+
+        // Emit real-time alert
+        const alertData = {
+            title,
+            message: assignedWaiter ? `${message} (Assigned to you)` : message,
+            priority: priority || 'high',
+            sender: senderName,
+            table_number: table_number || null,
+            assigned_to: assignedWaiter?.id || null,
+            created_at: new Date()
+        };
+
+        if (assignedWaiter) {
+            emitToUser(assignedWaiter.id, 'staff_alert', alertData);
+            // Also notify managers of the assignment
+            emitToRole('manager', 'staff_alert', { ...alertData, title: `[Assigned] ${title}` });
+        } else {
+            emitToRole(recipient_role, 'staff_alert', alertData);
+        }
+
+        // Always notify admin
+        if (recipient_role !== 'admin') {
+            emitToRole('admin', 'staff_alert', alertData);
+        }
+
+        res.json({
+            message: assignedWaiter
+                ? `Alert sent to assigned waiter ${assignedWaiter.full_name}`
+                : `Alert sent to ${targetStaffIds.length} staff members`
+        });
     } catch (error) {
         next(error);
     }

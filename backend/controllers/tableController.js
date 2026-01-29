@@ -53,6 +53,16 @@ export const updateTableStatus = async (req, res, next) => {
         }
 
         res.json({ message: 'Table status updated', table: result.rows[0] });
+
+        // Notify staff via sockets for real-time dashboard updates
+        import('../utils/socket.js').then(({ emitToRole }) => {
+            const table = result.rows[0];
+            const data = { table_number: table.table_number, status: table.status, id: table.id };
+            emitToRole('staff', 'table_status_updated', data);
+            emitToRole('waiter', 'table_status_updated', data);
+            emitToRole('manager', 'table_status_updated', data);
+            emitToRole('admin', 'table_status_updated', data);
+        }).catch(err => console.error('Socket notification failed:', err));
     } catch (error) {
         next(error);
     }

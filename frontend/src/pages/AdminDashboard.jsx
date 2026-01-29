@@ -43,7 +43,8 @@ import {
   Share2,
   Database,
   Key,
-  Link
+  Link,
+  Brain
 } from 'lucide-react';
 
 import {
@@ -318,6 +319,32 @@ const AdminDashboard = () => {
       toast.error('Failed to update payment');
     }
   };
+
+  const handleExport = async (exportFunction, filename) => {
+    try {
+      toast.loading('Preparing export...');
+      const response = await exportFunction();
+
+      // Create blob and download
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.dismiss();
+      toast.success('Export completed!');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Export failed');
+      console.error('Export error:', error);
+    }
+  };
+
 
 
 
