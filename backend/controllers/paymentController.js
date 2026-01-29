@@ -67,9 +67,9 @@ export const getRevenueStats = async (req, res, next) => {
     try {
         const stats = await pool.query(`
             SELECT 
-                SUM(CASE WHEN created_at >= CURRENT_DATE THEN amount ELSE 0 END) as daily_revenue,
-                SUM(CASE WHEN created_at >= DATE_TRUNC('week', CURRENT_DATE) THEN amount ELSE 0 END) as weekly_revenue,
-                SUM(CASE WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN amount ELSE 0 END) as monthly_revenue,
+                SUM(CASE WHEN p.created_at >= CURRENT_DATE THEN amount ELSE 0 END) as daily_revenue,
+                SUM(CASE WHEN p.created_at >= DATE_TRUNC('week', CURRENT_DATE) THEN amount ELSE 0 END) as weekly_revenue,
+                SUM(CASE WHEN p.created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN amount ELSE 0 END) as monthly_revenue,
                 COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_transactions,
                 COUNT(CASE WHEN payment_method = 'digital' THEN 1 END) as digital_transactions
             FROM payments p
