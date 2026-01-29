@@ -144,7 +144,7 @@ const CashierDashboard = () => {
             });
 
             // Update order payment status
-            await ordersAPI.updateStatus(selectedOrder.id, 'served', null);
+            await ordersAPI.updateStatus(selectedOrder.id, { status: 'served' });
 
             // Update table status to dirty (needs cleaning)
             if (selectedOrder.table_id) {

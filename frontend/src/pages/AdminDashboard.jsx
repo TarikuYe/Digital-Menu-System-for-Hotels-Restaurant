@@ -302,7 +302,7 @@ const AdminDashboard = () => {
 
   const handleUpdateOrderStatus = async (orderId, status, assigned_to) => {
     try {
-      await ordersAPI.updateStatus(orderId, status, assigned_to);
+      await ordersAPI.updateStatus(orderId, { status, assigned_to });
       toast.success('Order updated successfully');
       loadData();
     } catch (error) {

@@ -242,7 +242,7 @@ const WaiterDashboard = () => {
 
     const handleMarkServed = async (orderId) => {
         try {
-            await ordersAPI.updateStatus(orderId, 'served');
+            await ordersAPI.updateStatus(orderId, { status: 'served' });
             toast.success('Order marked as served');
             loadData();
         } catch (error) {
