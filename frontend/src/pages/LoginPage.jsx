@@ -44,7 +44,6 @@ const LoginPage = () => {
           password: formData.password,
         });
         login(response.data.token, response.data.user);
-        // Redirect to role-specific dashboard
         const dashboard = getRoleDashboard(response.data.user);
         navigate(dashboard);
       } else {
@@ -55,7 +54,6 @@ const LoginPage = () => {
           phone: formData.phone,
         });
         login(response.data.token, response.data.user);
-        // Redirect to role-specific dashboard
         const dashboard = getRoleDashboard(response.data.user);
         navigate(dashboard);
       }
@@ -67,40 +65,41 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-dark relative overflow-hidden px-4">
-      {/* Abstract brand-dark Elements */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gold/5 rounded-full blur-[120px] -mr-48 -mt-48" />
-      <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-gold/5 rounded-full blur-[120px] -ml-48 -mb-48" />
+    <div className="min-h-screen flex items-center justify-center bg-[#050505] relative overflow-hidden px-4 font-sans">
+      {/* Abstract Background Elements */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gold/5 rounded-full blur-[120px] -mr-48 -mt-48 animate-pulse" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gold/5 rounded-full blur-[120px] -ml-48 -mb-48 animate-pulse" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full relative z-10"
       >
         <div className="text-center mb-10">
           <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-gold/10 border border-gold/20 text-gold mb-8 shadow-[0_0_30px_rgba(212,175,55,0.15)]"
+            animate={{ rotate: [45, 90, 45] }}
+            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-gold flex items-center justify-center mb-8 shadow-2xl shadow-gold/20"
           >
-            <Star size={40} />
+            <div className="w-8 h-8 border-4 border-black" />
           </motion.div>
-          <h2 className="text-5xl md:text-6xl font-display font-black text-white mb-4 tracking-tighter">
-            Welcome <span className="text-gold">Home</span>
+
+          <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-4 tracking-tighter">
+            Abebe Zeleke <br />
+            <span className="text-gold">Digital Menu</span>
           </h2>
-          <p className="text-white/50 font-medium tracking-wide text-sm">
+          <p className="text-[#999] font-medium text-sm">
             {isLogin ? 'Enter your credentials to access the world class menu.' : 'Join the elite list for an exquisite culinary journey.'}
           </p>
         </div>
 
-        <div className="glass-card p-10 md:p-12">
-          {/* Form Content */}
+        <div className="bg-[#121212] border border-white/5 rounded-[2.5rem] p-8 md:p-12 shadow-2xl">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <motion.div
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-accent-red/10 border border-accent-red/20 text-accent-red px-5 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest text-center"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-red-500/10 border border-red-500/20 text-red-500 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center"
               >
                 {error}
               </motion.div>
@@ -108,13 +107,13 @@ const LoginPage = () => {
 
             <div className="space-y-4">
               {!isLogin && (
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
+                <div className="relative group">
+                  <User className="absolute left-5 top-1/2 -translate-y-1/2 text-[#555] group-focus-within:text-gold transition-colors" size={18} />
                   <input
                     name="full_name"
                     type="text"
                     required
-                    className="premium-input w-full pl-12 placeholder:text-white/20"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-sm focus:outline-none focus:border-gold/50 focus:bg-white/10 transition-all font-medium text-white"
                     placeholder="FULL NAME"
                     value={formData.full_name}
                     onChange={handleChange}
@@ -122,64 +121,50 @@ const LoginPage = () => {
                 </div>
               )}
 
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
+              <div className="relative group">
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#555] group-focus-within:text-gold transition-colors" size={18} />
                 <input
                   name="email"
                   type="email"
                   required
-                  className="premium-input w-full pl-12 placeholder:text-white/20"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-sm focus:outline-none focus:border-gold/50 focus:bg-white/10 transition-all font-medium text-white"
                   placeholder="EMAIL ADDRESS"
                   value={formData.email}
                   onChange={handleChange}
                 />
               </div>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
+              <div className="relative group">
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#555] group-focus-within:text-gold transition-colors" size={18} />
                 <input
                   name="password"
                   type="password"
                   required
-                  className="premium-input w-full pl-12 placeholder:text-white/20"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-sm focus:outline-none focus:border-gold/50 focus:bg-white/10 transition-all font-medium text-white"
                   placeholder="SECRET PASSWORD"
                   value={formData.password}
                   onChange={handleChange}
                 />
               </div>
-
-              {!isLogin && (
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gold/50" size={18} />
-                  <input
-                    name="phone"
-                    type="tel"
-                    className="premium-input w-full pl-12 placeholder:text-white/20"
-                    placeholder="PHONE (OPTIONAL)"
-                    value={formData.phone}
-                    onChange={handleChange}
-                  />
-                </div>
-              )}
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="premium-button w-full !py-5 flex items-center justify-center gap-3 group text-sm"
+              className="w-full bg-gold hover:bg-gold-light text-black py-5 rounded-2xl flex items-center justify-center gap-3 group text-xs font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-gold/10 active:scale-[0.98]"
             >
-              {loading ? 'Processing...' : isLogin ? 'Authenticate' : 'Establish Account'}
+              {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Establish Account'}
               {!loading && <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />}
             </button>
 
-            <div className="text-center pt-6">
+            <div className="text-center pt-4">
               <button
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
                 }}
-                className="text-white/40 hover:text-gold text-xs font-bold uppercase tracking-widest transition-all"
+                className="text-[#666] hover:text-white text-[10px] font-black uppercase tracking-widest transition-all"
               >
                 {isLogin ? "New Member? Register Here" : 'Existing Member? Access Now'}
               </button>
@@ -190,10 +175,10 @@ const LoginPage = () => {
         {/* Guest Access Shortcut */}
         {isLogin && (
           <div className="mt-12 text-center">
-            <p className="text-[10px] text-white/20 font-black uppercase tracking-[0.3em] mb-6 animate-pulse">Guest Experience</p>
+            <p className="text-[10px] text-[#444] font-black uppercase tracking-[0.3em] mb-6">Guest Experience</p>
             <button
               onClick={() => navigate('/menu')}
-              className="px-8 py-3 rounded-2xl border border-white/5 bg-white/5 text-white/50 text-xs font-bold uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all shadow-xl"
+              className="px-10 py-3 rounded-full border border-white/10 bg-white/5 text-white/50 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 hover:text-white transition-all"
             >
               Enter as Guest
             </button>
@@ -203,6 +188,7 @@ const LoginPage = () => {
     </div>
   );
 };
+
 
 export default LoginPage;
 

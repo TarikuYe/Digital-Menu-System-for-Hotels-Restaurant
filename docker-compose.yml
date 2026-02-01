@@ -39,7 +39,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=${DB_NAME:-hotel_menu_system}
       - DB_USER=${DB_USER:-postgres}
-      - DB_PASSWORD=${DB_PASSWORD:-Tare@kiya}
+      - DB_PASSWORD=${DB_PASSWORD:-Tare12@kiya}
       - JWT_SECRET=${JWT_SECRET:-hotel_menu_system_jwt_secret_key_2024_change_this_in_production}
       - JWT_EXPIRE=7d
       - CORS_ORIGIN=http://localhost:3000

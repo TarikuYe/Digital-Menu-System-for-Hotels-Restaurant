@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Info, Flame, Leaf, Wheat, Clock, Heart, Star as StarIcon } from 'lucide-react';
+import { ShoppingCart, Info, Flame, Leaf, Wheat, Clock, Heart, Star as StarIcon, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { SPICE_LEVELS } from '../../utils/constants.js';
@@ -14,11 +14,6 @@ const FoodCard = React.forwardRef(({ food }, ref) => {
   const navigate = useNavigate();
   const spiceInfo = SPICE_LEVELS[food.spice_level] || SPICE_LEVELS[0];
 
-  const allergenTypes = food.ingredients
-    ?.filter((ing) => ing.allergen_type)
-    .map((ing) => ing.allergen_type)
-    .filter((value, index, self) => self.indexOf(value) === index) || [];
-
   return (
     <>
       <motion.div
@@ -26,16 +21,16 @@ const FoodCard = React.forwardRef(({ food }, ref) => {
         layout
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        whileHover={{ y: -5 }}
-        className="glass-card overflow-hidden group hover:border-gold/30 transition-colors"
+        whileHover={{ y: -8 }}
+        className="group relative bg-[#121212] rounded-[2.5rem] overflow-hidden border border-white/5 hover:border-gold/20 transition-all duration-500 shadow-2xl"
       >
         {/* Image Section */}
-        <div className="relative h-56 overflow-hidden">
+        <div className="relative aspect-[4/4.5] overflow-hidden">
           {food.image_url ? (
             <img
               src={food.image_url}
               alt={food.name}
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
               onError={(e) => {
                 e.target.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=800';
               }}
@@ -46,77 +41,63 @@ const FoodCard = React.forwardRef(({ food }, ref) => {
             </div>
           )}
 
-          {/* Badge Overlay */}
-          <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-            {food.is_vegetarian && (
-              <div className="bg-accent-emerald/90 backdrop-blur-md text-white p-1.5 rounded-lg shadow-lg" title="Vegetarian">
-                <Leaf size={16} />
-              </div>
-            )}
+          {/* Badges Overlay */}
+          <div className="absolute top-5 left-5 right-5 flex justify-between items-start pointer-events-none">
+            <div className="flex flex-wrap gap-2">
+              {food.is_vegetarian && (
+                <span className="px-3 py-1 rounded-full bg-emerald-500/80 backdrop-blur-md text-[8px] font-black uppercase tracking-wider text-white border border-emerald-400/20">
+                  Vegetarian
+                </span>
+              )}
+              {food.is_vegan && (
+                <span className="px-3 py-1 rounded-full bg-blue-500/80 backdrop-blur-md text-[8px] font-black uppercase tracking-wider text-white border border-blue-400/20">
+                  Vegan
+                </span>
+              )}
+            </div>
             {food.is_gluten_free && (
-              <div className="bg-gold/90 backdrop-blur-md text-brand-dark p-1.5 rounded-lg shadow-lg" title="Gluten Free">
-                <Wheat size={16} />
-              </div>
-            )}
-            {food.average_rating >= 4.5 && (
-              <div className="bg-accent-amber/90 backdrop-blur-md text-brand-dark px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5" title="Top Choice">
-                <StarIcon size={12} fill="currentColor" />
-                <span className="text-[10px] font-black uppercase tracking-tighter">Tourist Favorite</span>
-              </div>
+              <span className="px-3 py-1 rounded-full bg-cyan-500/80 backdrop-blur-md text-[8px] font-black uppercase tracking-wider text-white border border-cyan-400/20">
+                Gluten-Free
+              </span>
             )}
           </div>
 
-          {/* Spice Level Indicator */}
-          {food.spice_level > 0 && (
-            <div className="absolute bottom-4 left-4 bg-brand-dark/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-              <Flame size={14} className={food.spice_level >= 3 ? 'text-accent-red' : 'text-accent-amber'} />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{spiceInfo.label}</span>
+          {/* Bottom Content Overlay */}
+          <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent">
+            <div className="flex justify-between items-end gap-4 mb-4">
+              <div>
+                <h3 className="text-lg font-display font-black text-white leading-tight">
+                  {food.name}
+                </h3>
+              </div>
+              <div className="text-xl font-black text-gold">
+                ${food.price}
+              </div>
             </div>
-          )}
 
-          {/* Prep Time */}
-          {food.preparation_time && (
-            <div className="absolute bottom-4 right-4 bg-brand-dark/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-              <Clock size={14} className="text-white/60" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">{food.preparation_time} min</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowDetail(true)}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2.5 rounded-full transition-all group/btn"
+              >
+                <Info size={16} className="text-white/60 group-hover/btn:text-white" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Details</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (isAuthenticated) {
+                    addToCart(food);
+                  } else {
+                    if (confirm('Please login to add items to cart.')) navigate('/login');
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 bg-gold hover:bg-gold-light text-black px-4 py-2.5 rounded-full transition-all active:scale-95"
+              >
+                <ShoppingCart size={16} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Order Now</span>
+              </button>
             </div>
-          )}
-        </div>
-
-        {/* Content Section */}
-        <div className="p-6">
-          <div className="flex justify-between items-start mb-2 gap-4">
-            <h3 className="text-xl font-display font-bold text-white group-hover:text-gold transition-colors line-clamp-1">
-              {food.name}
-            </h3>
-            <span className="text-xl font-bold text-gold shrink-0">${food.price}</span>
-          </div>
-
-          <p className="text-white/50 text-xs mb-6 line-clamp-2 min-h-[32px] leading-relaxed font-medium tracking-wide">
-            {food.description}
-          </p>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowDetail(true)}
-              className="flex-1 bg-white/5 border border-white/10 text-white hover:bg-white/10 py-3 rounded-xl transition-all flex items-center justify-center gap-2 group/btn"
-            >
-              <Info size={18} className="text-gray-400 group-hover/btn:text-white transition-colors" />
-              <span className="text-xs font-bold uppercase tracking-widest">Details</span>
-            </button>
-            <button
-              onClick={() => {
-                if (isAuthenticated) {
-                  addToCart(food);
-                } else {
-                  if (confirm('Please login to add items to cart.')) navigate('/login');
-                }
-              }}
-              className="flex-1 premium-button !p-0 !h-auto flex items-center justify-center gap-2"
-            >
-              <ShoppingCart size={18} />
-              <span className="text-xs font-bold uppercase tracking-widest">Add</span>
-            </button>
           </div>
         </div>
       </motion.div>

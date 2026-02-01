@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf, Bell } from 'lucide-react';
+import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf, Bell, Pizza, Coffee, Utensils, Zap, User } from 'lucide-react';
 import { foodsAPI, menusAPI, ordersAPI, communicationAPI } from '../services/api.js';
 import FoodCard from '../components/Menu/FoodCard.jsx';
 import LanguageSelector from '../components/Menu/LanguageSelector.jsx';
@@ -43,9 +43,6 @@ const MenuPage = () => {
     try {
       const response = await menusAPI.getAll({ include_foods: false });
       setMenus(response.data.menus);
-      if (response.data.menus.length > 0 && !selectedMenu) {
-        // setSelectedMenu(response.data.menus[0].id); // Keep it null initially to show "All"
-      }
     } catch (error) {
       console.error('Error loading menus:', error);
     }
@@ -81,13 +78,13 @@ const MenuPage = () => {
 
     if (!tableNum) {
       tableNum = prompt("Please enter your table number:");
-      if (!tableNum) return; // User cancelled
+      if (!tableNum) return;
     }
 
     try {
       setCalling(true);
       await communicationAPI.sendStaffAlert({
-        recipient_role: 'staff', // This targets the Waiter role (mapped to 'staff' in DB)
+        recipient_role: 'staff',
         title: 'Table Service Request',
         message: `Guest at Table ${tableNum} needs assistance.`,
         priority: 'high',
@@ -103,197 +100,185 @@ const MenuPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark text-white">
+    <div className="min-h-screen bg-brand-dark text-white font-sans">
       {/* Hero Section */}
-      <section className="relative h-[60vh] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
+      <section className="relative pt-24 px-6">
+        <div className="max-w-7xl mx-auto relative rounded-3xl overflow-hidden h-[450px] group">
           <img
             src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=2000"
-            className="w-full h-full object-cover opacity-30 scale-105"
-            alt="Hero brand-dark"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            alt="Hero Background"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-brand-dark/40 via-brand-dark/80 to-brand-dark" />
-        </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 text-center px-4"
-        >
-          <span className="inline-block px-5 py-1.5 rounded-full bg-gold/20 border border-gold/30 text-gold text-[10px] font-black uppercase tracking-[0.4em] mb-8 shadow-[0_0_20px_rgba(212,175,55,0.2)]">
-            Exquisite Dining
-          </span>
-          <h1 className="text-6xl md:text-9xl font-display font-black mb-8 tracking-tighter drop-shadow-2xl">
-            The <span className="text-gold">Digital</span> Menu
-          </h1>
-          <p className="text-white/70 max-w-2xl mx-auto text-lg md:text-2xl leading-relaxed font-light drop-shadow-lg">
-            Indulge in a curated selection of culinary masterpieces, <br className="hidden md:block" />
-            crafted with the finest ingredients and global inspiration.
-          </p>
-        </motion.div>
-      </section>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-20 relative z-20 pb-20">
-
-        {/* Live Kitchen Analytics Bar */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-center mb-10"
-        >
-          <div className="glass-card !py-3 !px-8 flex items-center gap-12 border-gold/10">
-            <div className="flex items-center gap-3">
-              <Clock size={16} className="text-gold" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Est. Prep Time</span>
-              <span className="text-sm font-bold text-white">{kitchenStats.estimated_wait_minutes} mins</span>
-            </div>
-            <div className="h-4 w-px bg-white/10" />
-            <div className="flex items-center gap-3">
-              <Flame size={16} className={kitchenStats.kitchen_load === 'high' ? 'text-accent-red animate-pulse' : 'text-gold'} />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Kitchen Load</span>
-              <span className={`text-sm font-bold uppercase ${kitchenStats.kitchen_load === 'high' ? 'text-accent-red' : 'text-gold'}`}>
-                {kitchenStats.kitchen_load}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+            <div className="mb-6">
+              <span className="inline-block px-4 py-1.5 rounded-full bg-gold/10 border border-gold/20 text-gold text-[10px] font-black uppercase tracking-[0.3em] backdrop-blur-sm">
+                Exquisite Selection
               </span>
             </div>
-          </div>
-        </motion.div>
+            <h1 className="text-5xl md:text-7xl font-display font-black mb-6 tracking-tight">
+              The <span className="text-gold">Digital</span> Menu
+            </h1>
+            <p className="text-gray-300 max-w-xl mx-auto text-sm md:text-base mb-8 leading-relaxed">
+              Indulge in a curated selection of culinary masterpieces, crafted with the finest ingredients and passion for innovation.
+            </p>
 
-        {/* Search & Actions Bar */}
-        <div className="glass-card p-4 md:p-6 mb-12 flex flex-col md:flex-row gap-6 items-center">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
-            <input
-              type="text"
-              placeholder="Search for your favorite dish..."
-              className="w-full premium-input pl-12"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-4 w-full md:w-auto">
-            <LanguageSelector language={language} setLanguage={setLanguage} />
-          </div>
-        </div>
-
-        {/* Categories Scroller */}
-        <div className="mb-12 overflow-x-auto no-scrollbar py-2">
-          <div className="flex gap-4">
-            <button
-              onClick={() => setSelectedMenu(null)}
-              className={`px-8 py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all whitespace-nowrap border-2 
-                ${selectedMenu === null
-                  ? 'bg-gold border-gold text-[#050505] shadow-[0_0_30px_rgba(212,175,55,0.3)]'
-                  : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
-            >
-              All Selection
-            </button>
-            {menus.map((menu) => (
-              <button
-                key={menu.id}
-                onClick={() => setSelectedMenu(menu.id)}
-                className={`px-8 py-3 rounded-xl font-black uppercase tracking-[0.2em] text-[10px] transition-all whitespace-nowrap border-2 
-                  ${selectedMenu === menu.id
-                    ? 'bg-gold border-gold text-[#050505] shadow-[0_0_30px_rgba(212,175,55,0.3)]'
-                    : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
-              >
-                {menu.name}
-              </button>
-            ))}
+            {/* Quick Stats Overlay */}
+            <div className="flex items-center gap-8 bg-black/30 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-gold" />
+                <span className="text-xs font-bold">{kitchenStats.estimated_wait_minutes} mins</span>
+              </div>
+              <div className="w-px h-4 bg-white/20" />
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-gold" />
+                <span className="text-xs font-bold capitalize">{kitchenStats.kitchen_load}</span>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div className="flex flex-col lg:flex-row gap-12">
-          {/* Filters Sidebar */}
-          <aside className="lg:w-64 shrink-0">
-            <div className="sticky top-8">
-              <h3 className="flex items-center gap-2 font-display text-xl font-bold mb-6">
-                <Filter size={20} className="text-gold" />
-                Refine Taste
-              </h3>
+      {/* Main Content Area */}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="flex flex-col lg:flex-row gap-8">
 
-              <div className="space-y-4">
-                {[
-                  { id: 'is_vegetarian', label: 'Vegetarian', icon: <Leaf size={16} /> },
-                  { id: 'is_vegan', label: 'Vegan', icon: <Star size={16} /> },
-                  { id: 'is_gluten_free', label: 'Gluten Free', icon: <ChevronRight size={16} /> },
-                ].map(filter => (
-                  <label
-                    key={filter.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-white/30 group-hover:text-gold transition-colors">{filter.icon}</span>
-                      <span className="text-xs font-black uppercase tracking-widest text-white/60 group-hover:text-white transition-colors">{filter.label}</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={filters[filter.id]}
-                      onChange={() => setFilters(prev => ({ ...prev, [filter.id]: !prev[filter.id] }))}
-                      className="w-5 h-5 rounded border-white/10 bg-white/5 text-gold focus:ring-gold"
-                    />
-                  </label>
-                ))}
+          {/* Sidebar */}
+          <aside className="lg:w-72 shrink-0">
+            <div className="sticky top-28 space-y-8">
+              {/* Refine Taste */}
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
+                <h3 className="flex items-center gap-2 font-display text-lg font-bold mb-6">
+                  <Filter size={18} className="text-gold" />
+                  Refine Taste
+                </h3>
+                <div className="space-y-4">
+                  {[
+                    { id: 'is_vegetarian', label: 'Vegetarian', icon: <Leaf size={16} className="text-green-500" /> },
+                    { id: 'is_vegan', label: 'Vegan', icon: <Utensils size={16} className="text-gold" /> },
+                    { id: 'is_gluten_free', label: 'Gluten Free', icon: <Zap size={16} className="text-orange-500" /> },
+                  ].map(filter => (
+                    <label
+                      key={filter.id}
+                      className="flex items-center gap-4 cursor-pointer group"
+                    >
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={filters[filter.id]}
+                          onChange={() => setFilters(prev => ({ ...prev, [filter.id]: !prev[filter.id] }))}
+                          className="peer w-5 h-5 appearance-none rounded border border-white/20 bg-white/5 checked:bg-gold checked:border-gold transition-all cursor-pointer"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 peer-checked:opacity-100 pointer-events-none transition-opacity">
+                          <svg className="w-3 h-3 text-black fill-current" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z" /></svg>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {filter.icon}
+                        <span className="text-sm font-medium text-gray-400 group-hover:text-white transition-colors">
+                          {filter.label}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <button className="w-full mt-6 text-xs font-bold text-gold text-left flex items-center gap-2 hover:translate-x-1 transition-transform">
+                  Browse all restrictions <ChevronRight size={14} />
+                </button>
               </div>
 
-              {/* Promo Card */}
-              <div className="mt-12 p-6 rounded-2xl bg-gradient-to-br from-gold/20 to-transparent border border-gold/10">
-                <h4 className="font-display font-bold text-lg mb-2 text-gold">Chef's Choice</h4>
-                <p className="text-sm text-gray-400 mb-4 font-light">Discover our seasonal highlights inspired by local spices.</p>
-                <button className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-white hover:text-gold transition-colors">
+              {/* Chef's Choice */}
+              <div className="bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-3xl p-6 bg-surface-dark">
+                <h4 className="font-display font-bold text-lg mb-2">Chef's Choice</h4>
+                <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                  Discover our seasonal highlights inspired by local spices.
+                </p>
+                <button className="text-xs font-bold text-gold flex items-center gap-1 hover:gap-2 transition-all">
                   Learn More <ChevronRight size={14} />
                 </button>
               </div>
             </div>
           </aside>
 
-          {/* Grid */}
-          <main className="flex-1">
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {[1, 2, 3, 4].map(i => (
-                  <div key={i} className="h-96 rounded-2xl bg-white/5 animate-pulse" />
+          {/* Grid Content */}
+          <main className="flex-1 space-y-8">
+            {/* Search and Categories */}
+            <div className="space-y-6">
+              <div className="relative group">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-gold transition-colors" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search for your favorite dish..."
+                  className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-14 pr-6 text-sm focus:outline-none focus:border-gold/50 focus:bg-white/10 transition-all font-medium"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Category Chips */}
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => setSelectedMenu(null)}
+                  className={`px-6 py-2.5 rounded-full text-xs font-bold whitespace-nowrap transition-all
+                    ${selectedMenu === null
+                      ? 'bg-gold text-black shadow-lg shadow-gold/20'
+                      : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'}`}
+                >
+                  All Selection
+                </button>
+                {menus.map((menu) => (
+                  <button
+                    key={menu.id}
+                    onClick={() => setSelectedMenu(menu.id)}
+                    className={`px-6 py-2.5 rounded-full text-xs font-bold whitespace-nowrap transition-all
+                      ${selectedMenu === menu.id
+                        ? 'bg-gold text-black shadow-lg shadow-gold/20'
+                        : 'bg-white/5 border border-white/10 text-white hover:bg-white/10'}`}
+                  >
+                    {menu.name}
+                  </button>
                 ))}
+                <button className="px-6 py-2.5 rounded-full text-xs font-bold bg-white/5 border border-white/10 text-white hover:bg-white/10">
+                  ... More
+                </button>
               </div>
-            ) : filteredFoods.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-32 bg-white/[0.02] rounded-[3rem] border border-dashed border-white/10"
-              >
-                <div className="w-24 h-24 rounded-full bg-gold/5 flex items-center justify-center mx-auto mb-8 border border-gold/10">
-                  <Search size={40} className="text-gold/50" />
-                </div>
-                <h3 className="text-3xl font-display font-bold mb-3 text-white">No delicacies found</h3>
-                <p className="text-white/40 max-w-xs mx-auto font-light">We couldn't find any matches for your current selection. <br /> Try adjusting your filters.</p>
-              </motion.div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <AnimatePresence mode="popLayout">
-                  {filteredFoods.map((food) => (
-                    <FoodCard key={food.id} food={food} />
+            </div>
+
+            {/* Food Grid */}
+            <div className="relative">
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="aspect-[4/5] rounded-[2rem] bg-white/5 animate-pulse" />
                   ))}
-                </AnimatePresence>
-              </div>
-            )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <AnimatePresence mode="popLayout">
+                    {filteredFoods.map((food) => (
+                      <FoodCard key={food.id} food={food} />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
           </main>
         </div>
       </div>
 
-      {/* Floating Call Waiter Button */}
+      {/* Cart/Notify FAB */}
       <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        onClick={handleCallWaiter}
-        disabled={calling}
-        className={`fixed bottom-8 right-8 z-[100] w-16 h-16 rounded-full bg-gold text-black shadow-[0_10px_40px_rgba(212,175,55,0.4)] border-4 border-brand-dark flex items-center justify-center group ${calling ? 'opacity-70 cursor-not-allowed' : ''}`}
+        className="fixed bottom-8 right-8 z-[100] w-14 h-14 rounded-full bg-gold text-black shadow-2xl flex items-center justify-center"
       >
-        <Bell size={24} className={`group-hover:animate-ring ${calling ? 'animate-pulse' : ''}`} />
-        <span className="absolute right-full mr-4 px-4 py-2 bg-brand-dark/90 backdrop-blur-md border border-gold/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-gold opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-          {calling ? 'Calling...' : 'Call Waiter'}
+        <Bell size={24} />
+        <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white text-[10px] font-bold rounded-full border-2 border-brand-dark flex items-center justify-center">
+          3
         </span>
       </motion.button>
     </div>
@@ -301,4 +286,5 @@ const MenuPage = () => {
 };
 
 export default MenuPage;
+
 
