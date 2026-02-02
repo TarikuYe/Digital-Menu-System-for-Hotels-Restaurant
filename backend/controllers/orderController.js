@@ -67,6 +67,20 @@ export const createOrder = async (req, res, next) => {
 
     const order = orderResult.rows[0];
 
+    // Update Table Status to occupied
+    if (tableId) {
+      const updateResult = await pool.query(
+        'UPDATE restaurant_tables SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        ['occupied', tableId]
+      );
+      const updatedTable = updateResult.rows[0];
+      const tableData = { table_number: updatedTable.table_number, status: updatedTable.status, id: updatedTable.id };
+      emitToRole(USER_ROLES.STAFF, 'table_status_updated', tableData);
+      emitToRole(USER_ROLES.MANAGER, 'table_status_updated', tableData);
+      emitToRole(USER_ROLES.ADMIN, 'table_status_updated', tableData);
+      emitToRole(USER_ROLES.CASHIER, 'table_status_updated', tableData);
+    }
+
     // Create items & initial log
     for (const item of orderItems) {
       await pool.query(

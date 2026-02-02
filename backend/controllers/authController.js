@@ -162,6 +162,20 @@ export const createGuestSession = async (req, res, next) => {
       [tableId, sessionToken, guest_name || null, expiresAt]
     );
 
+    // Update table status to occupied and notify staff
+    const updateResult = await pool.query(
+      'UPDATE restaurant_tables SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      ['occupied', tableId]
+    );
+    const updatedTable = updateResult.rows[0];
+
+    import('../utils/socket.js').then(({ emitToRole }) => {
+      const tableData = { table_number, status: 'occupied', id: tableId };
+      emitToRole('staff', 'table_status_updated', tableData);
+      emitToRole('manager', 'table_status_updated', tableData);
+      emitToRole('waiter', 'table_status_updated', tableData);
+    });
+
     res.json({
       token: sessionToken,
       session: result.rows[0],

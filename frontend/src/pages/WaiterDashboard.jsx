@@ -65,6 +65,7 @@ const WaiterDashboard = () => {
     const [stats, setStats] = useState({ ordersServed: 0, avgServiceTime: 0 });
     const [staffList, setStaffList] = useState([]);
     const [statusLoading, setStatusLoading] = useState(false);
+    const [showTableOrders, setShowTableOrders] = useState(null);
 
     const playNotificationSound = useCallback((priority = 'info') => {
         try {
@@ -430,7 +431,13 @@ const WaiterDashboard = () => {
                                     key={table.id}
                                     layout
                                     className={`glass-card p-6 border-2 ${getTableStatusColor(table.status)} cursor-pointer group`}
-                                    onClick={() => setSelectedTable(table)}
+                                    onClick={() => {
+                                        if (table.active_orders_count > 0 || table.status === 'occupied') {
+                                            setShowTableOrders(table);
+                                        } else {
+                                            setSelectedTable(table);
+                                        }
+                                    }}
                                 >
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
@@ -764,6 +771,92 @@ const WaiterDashboard = () => {
                                 >
                                     Add to Order
                                 </button>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Table Orders Modal */}
+                <AnimatePresence>
+                    {showTableOrders && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+                            onClick={() => setShowTableOrders(null)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.9, y: 20 }}
+                                className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gold/5">
+                                    <div>
+                                        <h2 className="text-3xl font-black">Table #{showTableOrders.table_number}</h2>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-gold mt-1">Active Orders</p>
+                                    </div>
+                                    <button onClick={() => setShowTableOrders(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                                    {orders.filter(o => o.table_id === showTableOrders.id && o.status !== 'served' && o.status !== 'cancelled').length === 0 ? (
+                                        <div className="text-center py-12">
+                                            <Utensils className="mx-auto text-gray-700 mb-4" size={48} />
+                                            <p className="text-gray-500">No active orders for this table.</p>
+                                        </div>
+                                    ) : (
+                                        orders.filter(o => o.table_id === showTableOrders.id && o.status !== 'served' && o.status !== 'cancelled').map(order => (
+                                            <div key={order.id} className="p-6 bg-white/5 rounded-2xl border border-white/5">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${getOrderStatusColor(order.status).replace('text-', 'border-').replace('text-', 'bg-')}/10 ${getOrderStatusColor(order.status)}`}>
+                                                        {order.status}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</span>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {order.items?.map(item => (
+                                                        <div key={item.id} className="flex justify-between text-sm">
+                                                            <span className="text-gray-300"><span className="text-gold font-bold">x{item.quantity}</span> {item.food_name}</span>
+                                                            <span className="font-bold">${item.subtotal}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {order.status === 'ready' && (
+                                                    <button
+                                                        onClick={() => handleMarkServed(order.id)}
+                                                        className="w-full mt-6 py-3 bg-green-500 text-white rounded-xl text-xs font-black uppercase hover:bg-green-600 transition-all shadow-lg shadow-green-500/20"
+                                                    >
+                                                        Mark as Served
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="p-6 bg-white/2 border-t border-white/5 flex gap-4">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedTable(showTableOrders);
+                                            setShowTableOrders(null);
+                                            handleCreateOrder();
+                                        }}
+                                        className="flex-1 py-4 bg-gold text-black rounded-xl text-xs font-black uppercase hover:bg-gold/80 transition-all"
+                                    >
+                                        Add New Order
+                                    </button>
+                                    <button
+                                        onClick={() => setShowTableOrders(null)}
+                                        className="flex-1 py-4 bg-white/5 text-white rounded-xl text-xs font-black uppercase hover:bg-white/10 transition-all border border-white/5"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
                             </motion.div>
                         </motion.div>
                     )}
