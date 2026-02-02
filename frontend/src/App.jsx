@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { CartProvider } from './context/CartContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
@@ -68,14 +68,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/menu" element={<MenuPage />} />
-      <Route
-        path="/orders"
-        element={
-          <PrivateRoute>
-            <OrderPage />
-          </PrivateRoute>
-        }
-      />
+      <Route path="/orders" element={<OrderPage />} />
       <Route
         path="/admin"
         element={
@@ -122,16 +115,31 @@ const AppRoutes = () => {
   );
 };
 
+// Container component to conditionally render Navbar
+const Layout = ({ children }) => {
+  const { pathname } = useLocation();
+  const dashboardRoutes = ['/admin', '/manager', '/kitchen', '/cashier', '/waiter'];
+  const isDashboard = dashboardRoutes.some(route => pathname.startsWith(route));
+
+  return (
+    <div className="min-h-screen bg-brand-dark">
+      {!isDashboard && <Navbar />}
+      <main className={!isDashboard ? "pt-20" : ""}>
+        {children}
+      </main>
+    </div>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
         <CartProvider>
           <Router>
-            <div className="min-h-screen bg-brand-dark">
-              <Navbar />
+            <Layout>
               <AppRoutes />
-            </div>
+            </Layout>
           </Router>
         </CartProvider>
       </SocketProvider>

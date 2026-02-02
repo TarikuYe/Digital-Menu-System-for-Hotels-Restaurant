@@ -15,45 +15,59 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }) => {
     const [socket, setSocket] = useState(null);
+    const [connected, setConnected] = useState(false);
     const { user, isAuthenticated } = useAuth();
 
     useEffect(() => {
-        const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        // Use proxy in dev, or absolute URL in prod
+        const socketUrl = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+
+        console.log(`🔌 Attempting socket connection to: ${socketUrl}`);
+
         const newSocket = io(socketUrl, {
             withCredentials: true,
-            transports: ['websocket', 'polling']
+            transports: ['polling', 'websocket'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 2000
+        });
+
+        newSocket.on('connect', () => {
+            console.log('📡 Connected to server via socket', newSocket.id);
+            setConnected(true);
+        });
+
+        newSocket.on('disconnect', (reason) => {
+            console.log('🔌 Disconnected from socket server:', reason);
+            setConnected(false);
+        });
+
+        newSocket.on('connect_error', (error) => {
+            console.error('❌ Socket connection error:', error.message);
+            setConnected(false);
         });
 
         setSocket(newSocket);
 
-        newSocket.on('connect', () => {
-            console.log('📡 Connected to server via socket');
+        return () => {
+            newSocket.off('connect');
+            newSocket.off('disconnect');
+            newSocket.off('connect_error');
+            newSocket.close();
+        };
+    }, []);
 
-            // Join user-specific rooms
-            if (isAuthenticated && user) {
-                if (user.role) newSocket.emit('join', user.role);
-                if (user.id) newSocket.emit('join_user', user.id);
-            }
-        });
-
-        newSocket.on('disconnect', () => {
-            console.log('🔌 Disconnected from socket server');
-        });
-
-        return () => newSocket.close();
-    }, [isAuthenticated, user]);
-
-    // Role-based room joining when auth state changes
+    // Handle room joining when connected or auth state changes
     useEffect(() => {
-        if (socket && isAuthenticated && user) {
+        if (socket && connected && isAuthenticated && user) {
+            console.log(`👤 Socket joining rooms for: ${user.role} (${user.id})`);
             if (user.role) socket.emit('join', user.role);
             if (user.id) socket.emit('join_user', user.id);
         }
-    }, [socket, isAuthenticated, user]);
+    }, [socket, connected, isAuthenticated, user]);
 
     const value = {
         socket,
-        connected: socket?.connected || false
+        connected
     };
 
     return (

@@ -83,8 +83,12 @@ const Navbar = () => {
           {isAuthenticated ? (
             <div className="flex items-center gap-4 pl-4 border-l border-white/5">
               <div className="hidden md:flex flex-col items-end">
-                <span className="text-xs font-black text-white leading-none mb-1">{user?.full_name}</span>
-                <span className="text-[8px] font-black text-gold uppercase tracking-[0.2em]">{user?.role}</span>
+                <span className="text-xs font-black text-white leading-none mb-1">
+                  {user?.isGuest ? `Table ${user.table_number}` : user?.full_name}
+                </span>
+                <span className="text-[8px] font-black text-gold uppercase tracking-[0.2em]">
+                  {user?.isGuest ? 'Dining Guest' : user?.role}
+                </span>
               </div>
               <button
                 onClick={handleLogout}

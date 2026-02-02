@@ -92,6 +92,8 @@ export const createOrder = async (req, res, next) => {
     emitToRole(USER_ROLES.MANAGER, 'new_order', orderNotification);
     emitToRole(USER_ROLES.ADMIN, 'new_order', orderNotification);
     emitToRole(USER_ROLES.STAFF, 'new_order', orderNotification);
+    emitToRole(USER_ROLES.CASHIER, 'new_order', orderNotification);
+    emitToRole(USER_ROLES.OWNER, 'new_order', orderNotification);
 
     res.status(201).json({ message: 'Order created successfully', orderId: order.id, order });
   } catch (error) {

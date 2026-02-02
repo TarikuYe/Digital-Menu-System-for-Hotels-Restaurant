@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingCart, Info, Flame, Leaf, Wheat, Clock, Heart, Star as StarIcon, Plus } from 'lucide-react';
+import { ShoppingCart, Info, Flame, Leaf, Wheat, Clock, Heart, Star as StarIcon, Plus, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { SPICE_LEVELS } from '../../utils/constants.js';
+import toast from 'react-hot-toast';
 import FoodDetailModal from './FoodDetailModal.jsx';
 
 const FoodCard = React.forwardRef(({ food }, ref) => {
@@ -86,11 +87,8 @@ const FoodCard = React.forwardRef(({ food }, ref) => {
 
               <button
                 onClick={() => {
-                  if (isAuthenticated) {
-                    addToCart(food);
-                  } else {
-                    if (confirm('Please login to add items to cart.')) navigate('/login');
-                  }
+                  addToCart(food);
+                  toast.success(`${food.name} added to cart!`);
                 }}
                 className="flex-1 flex items-center justify-center gap-2 bg-gold hover:bg-gold-light text-black px-4 py-2.5 rounded-full transition-all active:scale-95"
               >

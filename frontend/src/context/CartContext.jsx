@@ -11,19 +11,15 @@ export const useCart = () => {
 };
 
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
-
-  useEffect(() => {
-    // Load cart from localStorage
-    const savedCart = localStorage.getItem('cart');
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
-      }
+  const [cart, setCart] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (error) {
+      console.error('Error loading cart from localStorage:', error);
+      return [];
     }
-  }, []);
+  });
 
   useEffect(() => {
     // Save cart to localStorage whenever it changes
@@ -35,9 +31,7 @@ export const CartProvider = ({ children }) => {
     if (existingItem) {
       setCart(
         cart.map((item) =>
-          item.food_id === food.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
+          item.food_id === food.id ? { ...item, quantity: item.quantity + 1 } : item
         )
       );
     } else {

@@ -36,10 +36,11 @@ export const startSession = async (req, res, next) => {
         }
 
         // Check if table exists
-        const tableCheck = await pool.query('SELECT id FROM restaurant_tables WHERE id = $1', [table_id]);
+        const tableCheck = await pool.query('SELECT id, table_number FROM restaurant_tables WHERE id = $1', [table_id]);
         if (tableCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Table not found' });
         }
+        const tableNumber = tableCheck.rows[0].table_number;
 
         // Generate Session Token
         const sessionToken = generateToken();
@@ -65,6 +66,24 @@ export const startSession = async (req, res, next) => {
             session: result.rows[0],
             message: 'Guest session started'
         });
+
+        // Notify staff that a table is now occupied by a guest
+        import('../utils/socket.js').then(({ emitToRole, emitToAll }) => {
+            const session = result.rows[0];
+            const notificationData = {
+                table_id,
+                table_number: tableNumber,
+                guest_name: guest_name || 'Guest',
+                session_id: session.id,
+                status: 'occupied'
+            };
+            // Notify all relevant staff roles
+            ['staff', 'waiter', 'manager', 'admin'].forEach(role => {
+                emitToRole(role, 'guest_session_started', notificationData);
+            });
+            // Also standard table update
+            emitToAll('table_status_updated', { table_id, table_number: tableNumber, status: 'occupied' });
+        }).catch(err => console.error('Socket notification failed:', err));
     } catch (error) {
         next(error);
     }

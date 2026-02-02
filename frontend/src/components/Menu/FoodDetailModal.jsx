@@ -71,10 +71,6 @@ const FoodDetailModal = ({ food, onClose }) => {
   ];
 
   const handleAddToCart = () => {
-    if (!isAuthenticated) {
-      if (confirm('Please login to add items to cart.')) navigate('/login');
-      return;
-    }
     const customizedFood = { ...food, customizations: { spiceLevel } };
     addToCart(customizedFood);
     toast.success(`${food.name} added to cart!`);

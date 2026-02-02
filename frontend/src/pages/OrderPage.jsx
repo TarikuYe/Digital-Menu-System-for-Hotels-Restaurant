@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, ChevronLeft, Trash2, Plus, Minus, Clock, MapPin, Receipt, CheckCircle2, Timer, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -25,6 +25,7 @@ const OrderPage = () => {
   const { socket } = useSocket();
   const { cart, removeFromCart, updateQuantity, clearCart, getTotal } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCart, setShowCart] = useState(false);
@@ -65,6 +66,11 @@ const OrderPage = () => {
           }
         });
       }
+
+      // If user is guest, join their session room
+      if (socket && user?.isGuest) {
+        socket.emit('join_user', user.id);
+      }
     } catch (error) {
       console.error('Error loading orders:', error);
     } finally {
@@ -73,13 +79,23 @@ const OrderPage = () => {
   }, [socket]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // Both authenticated and guests (who have user object set) can load orders
+    if (user) {
       loadOrders();
     }
-  }, [isAuthenticated, loadOrders]);
+  }, [user, loadOrders]);
 
   useEffect(() => {
-    if (socket && isAuthenticated) {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('cart') === 'true') {
+      setShowCart(true);
+      // Clean up URL
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
+
+  useEffect(() => {
+    if (socket && user) {
       const handleStatusChange = (data) => {
         toast.success(data.message || `Order status updated to ${data.status}`, {
           icon: '🍽️',
@@ -104,10 +120,11 @@ const OrderPage = () => {
           food_id: item.food_id,
           quantity: item.quantity,
         })),
-        table_number: tableNumber || null,
+        table_number: tableNumber || user?.table_number || null,
         special_instructions: specialInstructions || null,
       };
-      await ordersAPI.create(orderData);
+      const res = await ordersAPI.create(orderData);
+      toast.success('Order placed successfully!', { icon: '🚀' });
       clearCart();
       setTableNumber('');
       setSpecialInstructions('');
@@ -123,28 +140,12 @@ const OrderPage = () => {
     return steps.indexOf(status);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4 text-center">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-12 max-w-md w-full">
-          <ShoppingBag size={64} className="mx-auto text-gold mb-6" />
-          <h2 className="text-3xl font-display font-bold mb-4">Member Access</h2>
-          <p className="text-gray-400 mb-8 font-light leading-relaxed">Please sign in to view your culinary journey and manage your orders.</p>
-          <button
-            onClick={() => navigate('/login')}
-            className="premium-button w-full"
-          >
-            Sign In to Continue
-          </button>
-        </motion.div>
-      </div>
-    );
-  }
+  // No early return for !isAuthenticated anymore
 
   return (
     <div className="min-h-screen bg-brand-dark text-white pb-20">
       {/* Header */}
-      <div className="bg-surface/50 backdrop-blur-md sticky top-0 z-40 border-b border-white/5">
+      <div className="bg-surface/50 backdrop-blur-md sticky top-20 z-40 border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex justify-between items-center">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-display font-bold">Order History</h1>
@@ -157,7 +158,7 @@ const OrderPage = () => {
             <ShoppingBag size={18} />
             <span className="text-sm">Cart</span>
             {cart.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-accent-red text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center border-2 border-brand-dark font-bold">
+              <span className="absolute -top-1 -right-1 bg-accent-red text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center border-2 border-brand-dark font-bold group-hover:scale-110 transition-transform">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
             )}
@@ -166,7 +167,18 @@ const OrderPage = () => {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 pt-12">
-        {loading ? (
+        {!isAuthenticated ? (
+          <div className="text-center py-20 bg-white/5 rounded-[3rem] border border-white/5 mb-12">
+            <h3 className="text-2xl font-display font-black text-white mb-3">Welcome to our Kitchen</h3>
+            <p className="text-[#999] text-sm max-w-sm mx-auto mb-8 font-medium">Add your favorite items from the menu and submit your order whenever you're ready.</p>
+            <button
+              onClick={() => navigate('/menu')}
+              className="bg-gold text-black px-10 py-3 rounded-full text-xs font-black uppercase tracking-widest"
+            >
+              Back to Menu
+            </button>
+          </div>
+        ) : loading ? (
           <div className="space-y-6">
             {[1, 2].map(i => <div key={i} className="h-64 rounded-3xl bg-white/5 animate-pulse" />)}
           </div>
@@ -319,8 +331,8 @@ const OrderPage = () => {
                     <p className="text-gray-500 font-light">Your cart is echoing... <br />Time for some flavor.</p>
                   </div>
                 ) : (
-                  cart.map(item => (
-                    <div key={item.food_id} className="flex justify-between items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 group/item">
+                  cart.map((item, idx) => (
+                    <div key={`${item.food_id}-${idx}`} className="flex justify-between items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 group/item">
                       <div className="flex-1">
                         <h4 className="font-bold text-white group-hover/item:text-gold transition-colors">{item.food_name}</h4>
                         <div className="text-xs text-gray-500 mt-1">${item.food_price} / unit</div>
@@ -343,7 +355,7 @@ const OrderPage = () => {
                       type="text"
                       placeholder="TABLE CODE (e.g. T-12)"
                       className="premium-input w-full text-center tracking-[0.3em] font-bold text-gold"
-                      value={tableNumber}
+                      value={tableNumber || user?.table_number || ''}
                       onChange={e => setTableNumber(e.target.value)}
                     />
                     <textarea
@@ -375,7 +387,7 @@ const OrderPage = () => {
         foodName={reviewTarget?.food_name}
         loading={reviewLoading}
       />
-    </div>
+    </div >
   );
 };
 

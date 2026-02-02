@@ -1,0 +1,9 @@
+{
+  "ignore": [
+    "*.log",
+    "*.txt",
+    "node_modules",
+    "scripts/temp/*"
+  ],
+  "ext": "js,json"
+}

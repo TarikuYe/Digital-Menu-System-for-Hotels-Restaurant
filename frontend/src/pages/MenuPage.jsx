@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf, Bell, Pizza, Coffee, Utensils, Zap, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Filter, Globe, ChevronRight, Star, Clock, Flame, Leaf, Bell, Pizza, Coffee, Utensils, Zap, User, ShoppingBag, Timer } from 'lucide-react';
 import { foodsAPI, menusAPI, ordersAPI, communicationAPI } from '../services/api.js';
 import FoodCard from '../components/Menu/FoodCard.jsx';
 import LanguageSelector from '../components/Menu/LanguageSelector.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useCart } from '../context/CartContext.jsx';
 import toast from 'react-hot-toast';
 
 const MenuPage = () => {
   const { user } = useAuth();
+  const { getItemCount } = useCart();
+  const navigate = useNavigate();
   const [menus, setMenus] = useState([]);
   const [foods, setFoods] = useState([]);
   const [selectedMenu, setSelectedMenu] = useState(null);
@@ -22,6 +26,7 @@ const MenuPage = () => {
     is_gluten_free: false,
   });
   const [calling, setCalling] = useState(false);
+  const [hasOrders, setHasOrders] = useState(false);
 
   useEffect(() => {
     loadMenus();
@@ -30,9 +35,15 @@ const MenuPage = () => {
 
   const loadAnalytics = async () => {
     try {
-      const response = await ordersAPI.getPrepTimeAnalytics();
-      setKitchenStats(response.data);
-    } catch (e) { console.error('Analytics failed'); }
+      const [analyticsRes, ordersRes] = await Promise.all([
+        ordersAPI.getPrepTimeAnalytics(),
+        user ? ordersAPI.getAll() : Promise.resolve({ data: { orders: [] } })
+      ]);
+      setKitchenStats(analyticsRes.data);
+      if (user && ordersRes.data.orders?.length > 0) {
+        setHasOrders(true);
+      }
+    } catch (e) { console.error('Analytics/Orders failed'); }
   };
 
   useEffect(() => {
@@ -124,17 +135,29 @@ const MenuPage = () => {
               Indulge in a curated selection of culinary masterpieces, crafted with the finest ingredients and passion for innovation.
             </p>
 
-            {/* Quick Stats Overlay */}
-            <div className="flex items-center gap-8 bg-black/30 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="text-gold" />
-                <span className="text-xs font-bold">{kitchenStats.estimated_wait_minutes} mins</span>
+            {/* Quick Stats Overlay & Track Button */}
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <div className="flex items-center gap-8 bg-black/30 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-2">
+                  <Clock size={16} className="text-gold" />
+                  <span className="text-xs font-bold">{kitchenStats.estimated_wait_minutes} mins</span>
+                </div>
+                <div className="w-px h-4 bg-white/20" />
+                <div className="flex items-center gap-2">
+                  <Zap size={16} className="text-gold" />
+                  <span className="text-xs font-bold capitalize">{kitchenStats.kitchen_load}</span>
+                </div>
               </div>
-              <div className="w-px h-4 bg-white/20" />
-              <div className="flex items-center gap-2">
-                <Zap size={16} className="text-gold" />
-                <span className="text-xs font-bold capitalize">{kitchenStats.kitchen_load}</span>
-              </div>
+
+              {hasOrders && (
+                <button
+                  onClick={() => navigate('/orders')}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-blue-600/20 active:scale-95"
+                >
+                  <Timer size={14} className="animate-pulse" />
+                  Track Live Orders
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -268,19 +291,58 @@ const MenuPage = () => {
         </div>
       </div>
 
-      {/* Cart/Notify FAB */}
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        className="fixed bottom-8 right-8 z-[100] w-14 h-14 rounded-full bg-gold text-black shadow-2xl flex items-center justify-center"
-      >
-        <Bell size={24} />
-        <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-600 text-white text-[10px] font-bold rounded-full border-2 border-brand-dark flex items-center justify-center">
-          3
-        </span>
-      </motion.button>
+      {/* Cart/Notify/Track FABs */}
+      <div className="fixed bottom-8 right-8 z-[100] flex flex-col gap-4">
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => navigate('/orders?cart=true')}
+          className="w-14 h-14 rounded-full bg-surface-light text-gold shadow-2xl flex items-center justify-center relative group border border-gold/20"
+          title="Open Cart"
+        >
+          <ShoppingBag size={24} />
+          {getItemCount() > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent-red text-white text-[10px] font-bold rounded-full border-2 border-brand-dark flex items-center justify-center">
+              {getItemCount()}
+            </span>
+          )}
+        </motion.button>
+
+        {hasOrders && (
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => navigate('/orders')}
+            className="w-14 h-14 rounded-full bg-blue-600 text-white shadow-2xl flex items-center justify-center relative group"
+            title="Track My Orders"
+          >
+            <Clock size={24} />
+            <span className="absolute right-full mr-4 px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              Track My Order
+            </span>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-gold text-black text-[10px] font-bold rounded-full border-2 border-brand-dark flex items-center justify-center animate-pulse">
+              !
+            </span>
+          </motion.button>
+        )}
+
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={handleCallWaiter}
+          disabled={calling}
+          className="w-14 h-14 rounded-full bg-gold text-black shadow-2xl flex items-center justify-center"
+          title="Call Waiter"
+        >
+          <Bell size={24} className={calling ? 'animate-bounce' : ''} />
+        </motion.button>
+      </div>
     </div>
   );
 };

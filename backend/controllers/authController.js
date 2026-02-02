@@ -30,7 +30,7 @@ export const register = async (req, res, next) => {
 
     // Create user
     const result = await pool.query(
-      'INSERT INTO users (email, password_hash, full_name, role, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, role, phone, created_at',
+      'INSERT INTO users (email, password_hash, full_name, role, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, full_name, role, phone, branch_id, created_at',
       [email, password_hash, full_name, role, phone || null]
     );
 
@@ -57,6 +57,7 @@ export const register = async (req, res, next) => {
         full_name: user.full_name,
         role: user.role,
         phone: user.phone,
+        branch_id: user.branch_id
       },
     });
   } catch (error) {
@@ -79,7 +80,7 @@ export const login = async (req, res, next) => {
 
     // Find user
     const result = await pool.query(
-      'SELECT id, email, password_hash, full_name, role, phone, is_active, status FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, full_name, role, phone, is_active, status, branch_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -117,6 +118,7 @@ export const login = async (req, res, next) => {
         full_name: user.full_name,
         role: user.role,
         phone: user.phone,
+        branch_id: user.branch_id
       },
     });
   } catch (error) {
@@ -128,7 +130,7 @@ export const login = async (req, res, next) => {
 export const getMe = async (req, res, next) => {
   try {
     const result = await pool.query(
-      'SELECT id, email, full_name, role, phone, created_at, status FROM users WHERE id = $1',
+      'SELECT id, email, full_name, role, phone, created_at, status, branch_id FROM users WHERE id = $1',
       [req.user.id]
     );
 

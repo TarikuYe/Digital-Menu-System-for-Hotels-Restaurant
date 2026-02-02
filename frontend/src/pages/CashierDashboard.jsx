@@ -30,13 +30,20 @@ import {
     History,
     CheckSquare
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ordersAPI, paymentsAPI, tablesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useSocket } from '../context/SocketContext';
 
 const CashierDashboard = () => {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
     const { socket } = useSocket();
     const [orders, setOrders] = useState([]);
     const [payments, setPayments] = useState([]);
@@ -95,12 +102,19 @@ const CashierDashboard = () => {
                 loadData(false);
             };
 
+            const handleNewOrder = (data) => {
+                toast.success(data.message || 'New order placed!', { icon: '💰' });
+                loadData(false);
+            };
+
+            socket.on('new_order', handleNewOrder);
             socket.on('order_status_updated', handleUpdate);
             socket.on('staff_alert', (data) => {
                 toast(data.message, { icon: '📢' });
             });
 
             return () => {
+                socket.off('new_order', handleNewOrder);
                 socket.off('order_status_updated', handleUpdate);
             };
         }
@@ -275,11 +289,19 @@ const CashierDashboard = () => {
                     {shiftOpen && (
                         <button
                             onClick={handleCloseShift}
-                            className="premium-button !py-3 !px-8 flex items-center gap-2 text-xs uppercase bg-red-500 hover:bg-red-600"
+                            className="premium-button !py-3 !px-8 flex items-center gap-2 text-xs uppercase bg-red-500/10 !border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white"
                         >
-                            <LogOut size={16} /> Close Shift
+                            <Shield size={16} /> Close Shift
                         </button>
                     )}
+
+                    <button
+                        onClick={handleLogout}
+                        className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-red-500 hover:bg-red-500/10 hover:border-red-500/20 transition-all duration-300 group"
+                        title="Sign Out"
+                    >
+                        <LogOut size={20} className="group-hover:scale-110 transition-transform" />
+                    </button>
                 </div>
             </header>
 

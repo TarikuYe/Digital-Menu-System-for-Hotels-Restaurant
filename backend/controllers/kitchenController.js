@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
-import { ORDER_STATUS } from '../utils/constants.js';
+import { ORDER_STATUS, USER_ROLES } from '../utils/constants.js';
+import { emitToRole, emitToOrder } from '../utils/socket.js';
 
 // Get active orders for the kitchen
 export const getKitchenOrders = async (req, res, next) => {
@@ -81,6 +82,20 @@ export const updateKitchenStatus = async (req, res, next) => {
                 'INSERT INTO order_status_logs (order_id, old_status, new_status, changed_by) VALUES ($1, $2, $3, $4)',
                 [id, oldStatus, status, req.user.id]
             );
+
+            // Emit to customer tracking room
+            emitToOrder(id, 'order_status_changed', {
+                orderId: id,
+                status,
+                message: `Kitchen updated your order status to: ${status}`
+            });
+
+            // Emit to other staff
+            const updateData = { orderId: id, status, updatedOrder: result.rows[0] };
+            emitToRole(USER_ROLES.MANAGER, 'order_status_updated', updateData);
+            emitToRole(USER_ROLES.ADMIN, 'order_status_updated', updateData);
+            emitToRole(USER_ROLES.STAFF, 'order_status_updated', updateData);
+            emitToRole(USER_ROLES.CASHIER, 'order_status_updated', updateData);
         }
 
         res.json({ message: 'Kitchen status updated', order: result.rows[0] });
