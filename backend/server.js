@@ -126,7 +126,3 @@ async function startServer() {
 }
 
 startServer();
-
-
-
-// Triggering restart

@@ -22,8 +22,8 @@ router.post('/', createOrder);
 router.get('/', getOrders);
 router.get('/:id', getOrderById);
 
-// Staff/Admin can update order status
-router.put('/:id/status', authorize(USER_ROLES.STAFF, USER_ROLES.ADMIN), updateOrderStatus);
+// Staff/Admin/Cashier/Kitchen/Manager can update order status
+router.put('/:id/status', authorize(USER_ROLES.STAFF, USER_ROLES.ADMIN, USER_ROLES.CASHIER, USER_ROLES.KITCHEN, USER_ROLES.MANAGER), updateOrderStatus);
 
 export default router;
 

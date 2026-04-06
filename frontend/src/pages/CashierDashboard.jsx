@@ -44,7 +44,7 @@ const CashierDashboard = () => {
         logout();
         navigate('/login');
     };
-    const { socket } = useSocket();
+    const { socket, connected } = useSocket();
     const [orders, setOrders] = useState([]);
     const [payments, setPayments] = useState([]);
     const [stats, setStats] = useState({
@@ -109,6 +109,12 @@ const CashierDashboard = () => {
 
             socket.on('new_order', handleNewOrder);
             socket.on('order_status_updated', handleUpdate);
+            socket.on('payment_created', handleUpdate);
+            socket.on('payment_updated', handleUpdate);
+            socket.on('table_status_updated', (data) => {
+                toast(`Table ${data.table_number || data.table_id} is now ${data.status}`, { icon: '🍽️' });
+                loadData(false);
+            });
             socket.on('staff_alert', (data) => {
                 toast(data.message, { icon: '📢' });
             });
@@ -116,6 +122,9 @@ const CashierDashboard = () => {
             return () => {
                 socket.off('new_order', handleNewOrder);
                 socket.off('order_status_updated', handleUpdate);
+                socket.off('payment_created', handleUpdate);
+                socket.off('payment_updated', handleUpdate);
+                socket.off('table_status_updated');
             };
         }
     }, [socket, loadData]);
@@ -158,11 +167,14 @@ const CashierDashboard = () => {
             });
 
             // Update order payment status
-            await ordersAPI.updateStatus(selectedOrder.id, { status: 'served' });
+            await ordersAPI.updateStatus(selectedOrder.id, {
+                status: 'served',
+                payment_status: 'paid'
+            });
 
-            // Update table status to dirty (needs cleaning)
+            // Update table status to available after payment (or dirty if needed)
             if (selectedOrder.table_id) {
-                await tablesAPI.updateStatus(selectedOrder.table_id, 'dirty');
+                await tablesAPI.updateStatus(selectedOrder.table_id, 'available');
             }
 
             const receipt = {
@@ -259,9 +271,15 @@ const CashierDashboard = () => {
                         </div>
                         Cashier <span className="text-gold">Terminal</span>
                     </h1>
-                    <p className="text-gray-500 font-medium uppercase tracking-[0.3em] text-[10px] mt-2 flex items-center gap-2">
-                        <Shield size={12} /> {user?.full_name} • Shift {shiftOpen ? 'Active' : 'Closed'}
-                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                        <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${connected ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`} />
+                            {connected ? 'Live Connection' : 'Disconnected'}
+                        </span>
+                        <p className="text-gray-500 font-medium uppercase tracking-[0.3em] text-[10px] flex items-center gap-2 border-l border-white/10 pl-3">
+                            <Shield size={12} /> {user?.full_name} • Shift {shiftOpen ? 'Active' : 'Closed'}
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap gap-4">

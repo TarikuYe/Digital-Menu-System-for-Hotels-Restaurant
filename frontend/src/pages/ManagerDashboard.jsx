@@ -189,11 +189,22 @@ const ManagerDashboard = () => {
             };
 
             socket.on('new_order', handleNewOrder);
+            socket.on('order_status_updated', loadData);
+            socket.on('payment_created', (data) => {
+                toast.success('New payment received!', { icon: '💰' });
+                loadData();
+            });
+            socket.on('payment_updated', loadData);
+            socket.on('table_status_updated', loadData);
             socket.on('staff_alert', handleAlert);
             socket.on('new_chat_message', handleNewChat);
 
             return () => {
                 socket.off('new_order', handleNewOrder);
+                socket.off('order_status_updated', loadData);
+                socket.off('payment_created');
+                socket.off('payment_updated');
+                socket.off('table_status_updated');
                 socket.off('staff_alert', handleAlert);
                 socket.off('new_chat_message', handleNewChat);
             };

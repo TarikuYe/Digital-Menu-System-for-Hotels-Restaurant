@@ -276,6 +276,15 @@ const AdminDashboard = () => {
 
       socket.on('new_order', handleNewOrder);
       socket.on('order_status_updated', handleUpdate);
+      socket.on('payment_created', () => {
+        if (activeTab === 'payments') loadData(false);
+      });
+      socket.on('payment_updated', () => {
+        if (activeTab === 'payments') loadData(false);
+      });
+      socket.on('table_status_updated', () => {
+        if (activeTab === 'settings') loadData(false);
+      });
       socket.on('new_announcement', (data) => {
         toast(data.title, { icon: '📣' });
         playNotificationSound('info');
@@ -301,6 +310,9 @@ const AdminDashboard = () => {
       return () => {
         socket.off('new_order', handleNewOrder);
         socket.off('order_status_updated', handleUpdate);
+        socket.off('payment_created');
+        socket.off('payment_updated');
+        socket.off('table_status_updated');
         socket.off('new_announcement');
         socket.off('staff_alert');
         socket.off('new_chat_message');

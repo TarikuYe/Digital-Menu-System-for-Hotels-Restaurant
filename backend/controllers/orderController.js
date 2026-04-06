@@ -143,8 +143,14 @@ export const getOrders = async (req, res, next) => {
     }
 
     if (status) {
-      query += ` AND o.status = $${params.length + 1}`;
-      params.push(status);
+      const statusList = status.split(',');
+      if (statusList.length > 1) {
+        query += ` AND o.status = ANY($${params.length + 1})`;
+        params.push(statusList);
+      } else {
+        query += ` AND o.status = $${params.length + 1}`;
+        params.push(status);
+      }
     }
 
     query += ` ORDER BY o.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
@@ -213,6 +219,12 @@ export const updateOrderStatus = async (req, res, next) => {
       paramCount++;
       updateQuery += `, total_amount = $${paramCount}`;
       params.push(req.body.total_amount);
+    }
+
+    if (req.body.payment_status) {
+      paramCount++;
+      updateQuery += `, payment_status = $${paramCount}`;
+      params.push(req.body.payment_status);
     }
 
     updateQuery += ' WHERE id = $1 RETURNING *';

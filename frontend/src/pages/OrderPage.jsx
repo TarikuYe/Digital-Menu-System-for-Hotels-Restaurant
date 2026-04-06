@@ -55,6 +55,7 @@ const OrderPage = () => {
   const loadOrders = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
+
       const response = await ordersAPI.getAll();
       setOrders(response.data.orders);
 
@@ -216,13 +217,20 @@ const OrderPage = () => {
                       <div className="text-3xl font-bold text-white mb-1">${order.total_amount}</div>
                       <div className="flex flex-col items-end gap-1">
                         <div className="text-xs font-bold uppercase tracking-widest text-gold">{STATUS_DETAILS[order.status]?.label || order.status}</div>
-                        {order.estimated_prep_time && order.status !== 'ready' && order.status !== 'served' && (
-
-                          <div className="flex items-center gap-1.5 px-3 py-1 bg-gold/10 rounded-full border border-gold/20">
-                            <Timer size={10} className="text-gold" />
-                            <span className="text-[9px] font-black uppercase text-gold">ETC: {order.estimated_prep_time} MIN</span>
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          {order.payment_status === 'paid' && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+                              <CheckCircle2 size={10} className="text-green-500" />
+                              <span className="text-[9px] font-black uppercase text-green-500">PAID</span>
+                            </div>
+                          )}
+                          {order.estimated_prep_time && order.status !== 'ready' && order.status !== 'served' && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-gold/10 rounded-full border border-gold/20">
+                              <Timer size={10} className="text-gold" />
+                              <span className="text-[9px] font-black uppercase text-gold">ETC: {order.estimated_prep_time} MIN</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

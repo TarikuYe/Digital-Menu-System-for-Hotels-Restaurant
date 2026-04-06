@@ -1,4 +1,6 @@
 import pool from '../config/database.js';
+import { emitToRole } from '../utils/socket.js';
+import { USER_ROLES } from '../utils/constants.js';
 
 // Get all payments with order details
 export const getPayments = async (req, res, next) => {
@@ -55,8 +57,15 @@ export const updatePaymentStatus = async (req, res, next) => {
 
         if (result.rows.length === 0) return res.status(404).json({ error: 'Payment not found' });
 
+        const updatedPayment = result.rows[0];
+        // Emit socket event for real-time updates
+        const updateData = { paymentId: id, status, updatedPayment };
+        emitToRole(USER_ROLES.CASHIER, 'payment_updated', updateData);
+        emitToRole(USER_ROLES.MANAGER, 'payment_updated', updateData);
+        emitToRole(USER_ROLES.ADMIN, 'payment_updated', updateData);
+
         // If payment is completed, we might want to auto-update order status or trigger receipt
-        res.json({ message: 'Payment status updated', payment: result.rows[0] });
+        res.json({ message: 'Payment status updated', payment: updatedPayment });
     } catch (error) {
         next(error);
     }
@@ -96,8 +105,15 @@ export const createPayment = async (req, res, next) => {
             [order_id, amount, payment_method, transaction_reference || null]
         );
 
-        res.status(201).json({ payment: result.rows[0] });
+        const payment = result.rows[0];
+        // Emit socket events
+        emitToRole(USER_ROLES.CASHIER, 'payment_created', { payment });
+        emitToRole(USER_ROLES.MANAGER, 'payment_created', { payment });
+        emitToRole(USER_ROLES.ADMIN, 'payment_created', { payment });
+
+        res.status(201).json({ payment });
     } catch (error) {
+        console.error('Payment creation error:', error.message);
         next(error);
     }
 };
